@@ -1,0 +1,11 @@
+success_code =              200
+post_success_code =         201
+empty_success_code =        204
+error_code =                400
+unauthorized_code =         401
+forbidden_code =            403
+not_found_code =            404
+method_not_allowed_code =   405
+unprocessable_code =        422
+too_many_requests_code =    429
+internal_server_error_code =500
