@@ -36,18 +36,3 @@ def require_login(func, login=True):
             raise UnauthorizedError
         return func(*args, **kwargs)
     return _formatter
-
-
-def require_otp(func, otp=True):
-    """Decorate func raises error if otp required.
-
-    Raises :class:`core.api.exceptions.UnauthorizedOTPError`
-    """
-    def _formatter(*args, **kwargs):
-        if otp and current_user.is_authenticated() and \
-                current_user.confirmed_totp_device and \
-                not current_user.otp_verified:
-            msg = current_app.config['TWO_FACTOR_ERROR_MSG']
-            raise UnauthorizedOTPError(description=msg)
-        return func(*args, **kwargs)
-    return _formatter

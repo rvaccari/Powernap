@@ -1,8 +1,8 @@
 from flask import current_app, request
 from flask_login import current_user
 
-from core.api.exceptions import RequestLimitError
-from core.extensions import redis_connection
+from powernap.exceptions import RequestLimitError
+from powernap.helpers import redis_connection
 
 
 def check_rate_limit():

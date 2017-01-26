@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlalchemy.sql.sqltypes import Boolean, Integer, String, DateTime
 
-from core.api.exceptions import InvalidFormError
+from powernap.exceptions import InvalidFormError
 from core.ubersmithdb.types import Formatted, UnicodeSafe
 
 query_columns = {}

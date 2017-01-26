@@ -52,11 +52,6 @@ class UnauthorizedError(ApiError):
     code = unauthorized_code
 
 
-class UnauthorizedOTPError(ApiError):
-    """Raise when authorized user tries to access page without verified OTP."""
-    code = unauthorized_code
-
-
 class UbersmithAPIError(ApiError):
     """Raise when a ResponseError is raised by the ubersmith API."""
     code = error_code

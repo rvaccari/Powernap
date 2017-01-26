@@ -15,5 +15,5 @@ class PermissionsMixin(object):
 
     @property
     def redis_token(self):
-        """Token stored in redis for ratelimiting and OTP."""
+        """Token stored in redis for ratelimiting and other datas."""
         return "{}:{}".format(str(self.__class__), self.id)

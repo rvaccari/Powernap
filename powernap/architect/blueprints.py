@@ -1,7 +1,7 @@
 import inspect
-import os
 
 from flask import Blueprint, current_app, request
+from flask_login import LoginManager
 
 from architect.http_codes import (
     empty_success_code,
@@ -9,15 +9,18 @@ from architect.http_codes import (
     post_success_code,
     success_code,
 )
-from architect.responses import format_api_response
-from architect.loaders import init_view_modules
-from query import construct_query
-from auth.decorators import (
+from powernap.architect.responses import format_api_response
+from powernap.architect.loaders import init_view_modules
+from powernap.query import construct_query
+from powernap.auth.decorators import (
     require_login,
-    require_otp,
     require_permissions,
     require_public,
 )
+from powernap.auth.token import (
+    TokenManager,
+    user_from_redis_token,
+    request_user_wrapper
 
 
 class Architect:
@@ -26,7 +29,8 @@ class Architect:
 
     def __init__(self, version=1, prefix=None, base_dir="", template_dir="",
                  name="architect", response_blueprint=None,
-                 route_decorator_func=None):
+                 route_decorator_func=None, login_manager=None,
+                 user_loader=None, temp_token_class=None):
         """
         :param version: (int) version number for endpoints registerd with this
             architect.
@@ -43,6 +47,12 @@ class Architect:
             of decorators that will be applied to an endpoint. This function
             can be used to override, add to, or subtract from the default
             decorators applied to endpoints.
+        :param login_manager: (class): Instance of `flask_login.LoginManager`
+            used to set current_user value.
+        :param temp_token_class: (class): Class to be used as a wrapper around
+            the temporary token data from redis.abs
+        :param user_loader: (func): function for
+            `login_manager.requreset_loader`
         """
         self.version = version
         self._prefix = prefix
@@ -56,6 +66,15 @@ class Architect:
         self._before_request_methods = []
         self._after_request_methods = []
         self.route_decorator_func = route_decorator_func or (lambda x: x)
+
+        self._login_manager = login_manager or LoginManager()
+        user_loader = request_user_wrapper(user_loader or user_from_redis_token)
+        self._login_manager.request_loader(user_loader)
+        self.temp_token_clas = temp_token_class
+
+    def init_app(self, app):
+        self.login_manager.init_app(app)
+        app.register_blueprint(self)
 
     @property
     def crudify_methods(self):
@@ -119,11 +138,10 @@ class Architect:
         return self.route_decorator_func(self.default_decorators)
 
     @property
-    def _default_decorators(self, blueprint):
+    def default_decorators(self):
         return [
             ("public", require_public),
             ("login", require_login),
-            ("otp", require_otp),
             ("permissions", require_permissions),
             ("format_", format_api_response),
         ]
