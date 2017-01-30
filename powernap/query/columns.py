@@ -3,22 +3,21 @@ from datetime import datetime
 from sqlalchemy.sql.sqltypes import Boolean, Integer, String, DateTime
 
 from powernap.exceptions import InvalidFormError
-from core.ubersmithdb.types import Formatted, UnicodeSafe
 
-query_columns = {}
+
+QUERY_COLUMNS = {}
 
 
 class _QueryMeta(type):
-    """On import makes `query_columns`.
+    """On import makes `QUERY_COLUMNS`.
 
     Key is column type defined by `impl` and value is string
     of the name of a :class:`.BaseQueryColumn` subclass."""
     def __init__(cls, name, bases, dct):
         impl = dct['impl']
-        if not isinstance(impl, list):
-            impl = [impl]
+        impl = [impl] if not isinstance(impl, list) else impl
         for i in impl:
-            query_columns[i] = name
+            QUERY_COLUMNS[i] = cls
         super(_QueryMeta, cls).__init__(name, bases, dct)
 
 
@@ -78,7 +77,7 @@ class BooleanQueryColumn(IntegerQueryColumn):
 
 
 class StringQueryColumn(BaseQueryColumn):
-    impl = [String, UnicodeSafe]
+    impl = String
 
 
 class DateTimeQueryColumn(BaseQueryColumn):
@@ -88,32 +87,3 @@ class DateTimeQueryColumn(BaseQueryColumn):
         if isinstance(value, (int, str)):
             value = datetime.fromtimestamp(int(value))
         return super(DateTimeQueryColumn, self).handle(column, value, func)
-
-
-class FormatedQueryColumn(BaseQueryColumn):
-    ''' Allow querying based on strings for formatted int columns. '''
-    impl = Formatted
-
-    def _reverse_value_map_query(self, column, query_value):
-        field = getattr(self.cls, column)
-        value_map = field.property.columns[0].type.value_map
-        for k, v in value_map.items():
-            if v == query_value:
-                return k
-        else:
-            error_message = (
-                "'{query_value}' is not a valid parameter for '{column}'. "
-                'Valid options are: {values}'
-            ).format(
-                query_value=query_value,
-                column=column,
-                values=', '.join(list(value_map.values()))
-            )
-            error = {'fields': {column: [error_message]}}
-            raise InvalidFormError(description=error)
-
-    def handle(self, column, value, func):
-        self.check_exposed_column(column)
-        if isinstance(value, str):
-            value = self._reverse_value_map_query(column, value)
-        return self.handle_method(column, value, func)

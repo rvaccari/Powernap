@@ -1,11 +1,7 @@
 from flask import abort, current_app
 from flask_login import current_user
 
-from powernap.exceptions import (
-    PermissionError,
-    UnauthorizedError,
-    UnauthorizedOTPError,
-)
+from powernap.exceptions import PermissionError, UnauthorizedError
 
 
 def require_public(func, public=False):

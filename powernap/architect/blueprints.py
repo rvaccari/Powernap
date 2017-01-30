@@ -3,34 +3,39 @@ import inspect
 from flask import Blueprint, current_app, request
 from flask_login import LoginManager
 
-from architect.http_codes import (
-    empty_success_code,
-    error_code,
-    post_success_code,
-    success_code,
-)
-from powernap.architect.responses import format_api_response
 from powernap.architect.loaders import init_view_modules
-from powernap.query import construct_query
+from powernap.architect.requests import ApiRequest
+from powernap.architect.responses import format_api_response, APIEncoder
 from powernap.auth.decorators import (
     require_login,
     require_permissions,
     require_public,
 )
+from powernap.auth.rate_limit import check_rate_limit
 from powernap.auth.token import (
-    TokenManager,
-    user_from_redis_token,
-    request_user_wrapper
+    user_from_redis_token_wrapper,
+    request_user_wrapper,
+)
+from powernap.cors import init_cors
+from powernap.exceptions import ApiError, api_error
+from powernap.http_codes import (
+    empty_success_code,
+    error_code,
+    post_success_code,
+    success_code,
+)
+from powernap.query.transformer import construct_query
 
 
 class Architect:
-    "Registers multiple :class:`core.architect.blueprints.ResponseBlueprint`."
+    "Registers multiple :class:`powernap.architect.blueprints.ResponseBlueprint`."
     blueprints = []
 
     def __init__(self, version=1, prefix=None, base_dir="", template_dir="",
                  name="architect", response_blueprint=None,
-                 route_decorator_func=None, login_manager=None,
-                 user_loader=None, temp_token_class=None):
+                 route_decorator_func=None, login_manager=None, user_class=None,
+                 user_loader=None, temp_token_class=None, api_encoder=None,
+                 before_request_funcs=None, after_request_funcs=None):
         """
         :param version: (int) version number for endpoints registerd with this
             architect.
@@ -49,10 +54,17 @@ class Architect:
             decorators applied to endpoints.
         :param login_manager: (class): Instance of `flask_login.LoginManager`
             used to set current_user value.
+        :param user_class: (class): Class that `user_from_redis_token` should
+            return an instance of for the `current_user`.
         :param temp_token_class: (class): Class to be used as a wrapper around
             the temporary token data from redis.abs
         :param user_loader: (func): function for
             `login_manager.requreset_loader`
+        :param api_encoder: (class): Json encoder to be used by the application.
+        :param before_request_funcs: (list): List of functions to run
+            before requests.
+        :param after_request_funcs: (list): List of functions to run
+            after requests.
         """
         self.version = version
         self._prefix = prefix
@@ -60,51 +72,48 @@ class Architect:
         self.template_dir = template_dir
         self.name = name
         self.response_blueprint = response_blueprint or ResponseBlueprint
-        self._crudify_methods = {
+        self._crudify_funcs = {
             v: None for v in ("GET", "GET ONE", "PUT", "POST", "DELETE")
         }
-        self._before_request_methods = []
-        self._after_request_methods = []
         self.route_decorator_func = route_decorator_func or (lambda x: x)
+        self._init_login_manager(
+            login_manager, user_loader, user_class, temp_token_class)
+        self.api_encoder = api_encoder or APIEncoder
+        self.before_request_funcs = before_request_funcs or [check_rate_limit]
+        self.after_request_funcs = after_request_funcs or []
 
-        self._login_manager = login_manager or LoginManager()
-        user_loader = request_user_wrapper(user_loader or user_from_redis_token)
-        self._login_manager.request_loader(user_loader)
+    def _init_login_manager(self, login_manager, user_loader, user_class,
+                            temp_token_class):
+        if not user_loader and not user_class:
+            raise Exception(
+                'Define either the "user_loader" or "user_class" kwarg.')
+        user_loader = user_loader or user_from_redis_token_wrapper(user_class)
+        self.login_manager = login_manager or LoginManager()
+        self.login_manager.request_loader(request_user_wrapper(user_loader))
         self.temp_token_clas = temp_token_class
 
     def init_app(self, app):
+        app.json_encoder = self.api_encoder
         self.login_manager.init_app(app)
         app.register_blueprint(self)
+        app.request_class = ApiRequest
+        app.register_error_handler(ApiError, api_error)
+        app.register_error_handler(404, api_error)
+        init_cors(app)
 
     @property
-    def crudify_methods(self):
-        return self._crudify_methods
+    def crudify_funcs(self):
+        return self._crudify_funcs
 
-    @crudify_methods.setter
-    def crudify_methods(self, **kwargs):
-        self.crudify_methods.update(kwargs)
-
-    @property
-    def before_request_methods(self):
-        return self._before_request_methods
-
-    @before_request_methods.setattr
-    def before_request_methods(self, value):
-        self._before_request_methods = value
-
-    @property
-    def after_request_methods(self):
-        return self._after_request_methods
-
-    @after_request_methods.setattr
-    def after_request_methods(self, value):
-        self._after_request_methods = value
+    @crudify_funcs.setter
+    def crudify_funcs(self, **kwargs):
+        self.crudify_funcs.update(kwargs)
 
     @property
     def custom_route_decorators(self):
         return self._route_decorators
 
-    @custom_route_decorators.setattr
+    @custom_route_decorators.setter
     def custom_route_decorators(self, value):
         self._route_decorators = value
 
@@ -121,7 +130,7 @@ class Architect:
         kwargs.update({
             'url_prefix': "/".join((self.prefix, url_prefix)),
             'template_folder': self.template_dir,
-            "crudify_methods": self.crudify_methods,
+            "crudify_funcs": self.crudify_funcs,
             "custom_route_decorators": self.custom_route_decorators,
         })
         blueprint = self.response_blueprint(name, **kwargs)
@@ -157,19 +166,19 @@ class ResponseBlueprint(Blueprint):
     links = []
     cors_rules = []
 
-    def __init__(self, name, import_name='', public=False, crudify_methods={},
+    def __init__(self, name, import_name='', public=False, crudify_funcs={},
                  **kwargs):
         super(ResponseBlueprint, self).__init__(name, import_name, **kwargs)
         self.public = public
         self._route_decorators = []
-        self.crudify_methods = crudify_methods
+        self.crudify_funcs = crudify_funcs
         self._decorators = []
 
     @property
     def decorators(self):
         return self._decorators
 
-    @decorators.setattr
+    @decorators.setter
     def decorators(self, value):
         self._decorators = value
 
@@ -246,21 +255,23 @@ class ResponseBlueprint(Blueprint):
             return empty_success_code
 
         funcs = (
-            ("GET", self.crudify_methods.get("GET", get_func)),
-            ("GET ONE", self.crudify_methods.get("GET ONE", get_one_func)),
-            ("POST", self.crudify_methods.get("POST", post_func)),
-            ("PUT", self.crudify_methods.get("PUT", put_func)),
-            ("DELETE", self.crudify_methods.get("DELETE", delete_func)),
+            ("GET", self.crudify_funcs.get("GET", get_func)),
+            ("GET ONE", self.crudify_funcs.get("GET ONE", get_one_func)),
+            ("POST", self.crudify_funcs.get("POST", post_func)),
+            ("PUT", self.crudify_funcs.get("PUT", put_func)),
+            ("DELETE", self.crudify_funcs.get("DELETE", delete_func)),
         )
 
         for method, func in funcs:
             if method not in ignore:
-                self.route_crudify_method(method, func, permissions)
+                self.route_crudify_method(
+                    url, model, method, func, permissions, **kwargs)
 
-    def route_crudify_method(self, method, func, permissions):
+    def route_crudify_method(self, url, model, method, func, all_permissions,
+                             **kwargs):
         method_url = url
         func.__name__ = "{}_{}".format(method, model.__name__)
-        perms = permissions.get(method)
+        permissions = all_permissions.get(method)
         if inspect.getargspec(func).args:
             method_url += "/<int:id>"
         methods = [method.split(' ')[0]]

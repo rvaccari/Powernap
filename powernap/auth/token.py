@@ -3,9 +3,6 @@ import os
 
 from flask import current_app
 from flask_login import current_user
-
-from core import ubersmithdb
-
 from powernap.helpers import redis_connection
 
 
@@ -86,10 +83,10 @@ def request_user_wrapper(f):
     return inner
 
 
-def user_from_redis_token(token, redis=None):
-    redis = redis if redis else redis_connection()
-    temp_token = TempToken.retrieve(token)
-    user_type = temp_token.user_type
-    user_id = temp_token.user_id
-    if user_type and user_id:
-        return getattr(ubersmithdb, user_type).query.get(user_id)
+def user_from_redis_token_wrapper(user_class):
+    def user_from_redis_token(token, redis=None):
+        redis = redis if redis else redis_connection()
+        temp_token = TempToken.retrieve(token)
+        pk = getattr(temp_token, current_app.config["active_tokens_attr"])
+        return user_class.query.get(pk)
+    return user_from_redis_token

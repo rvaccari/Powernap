@@ -15,10 +15,10 @@ def init_view_modules(current_dir, parent_path=None):
         following recursive iterations to generate the `prefix`.
         The `prefix` is a string of the import path of the file
 
-        eg. `core.architect.blueprints`
+        eg. `powernap.architect.blueprints`
 
     We have to initialize `views.py` files that use
-    :class:`core.architect.blueprints.Architect` to add blueprints,
+    :class:`powernap.architect.blueprints.Architect` to add blueprints,
     otherwise the :meth:`Architect.register` will do nothing.
     Because the `views.py` files were not initialized,
     :meth:`sub_blueprint` will never get run and there will be no

@@ -4,8 +4,8 @@ from flask import current_app, request
 from flask_login import current_user
 from sqlalchemy import exc
 
-from core.api.exceptions import InvalidFormError
-from core.mason import columns
+from powernap.exceptions import InvalidFormError
+from powernap.query.columns import BaseQueryColumn, QUERY_COLUMNS
 
 
 def construct_query(cls, enforce_owner=True, **kwargs):
@@ -70,6 +70,8 @@ def override_query_args(cls, query_args, **kwargs):
 
 
 class QueryTransformer:
+    query_columns = QUERY_COLUMNS
+
     def __init__(self, cls=None, query=None):
         self.cls = cls or query._primary_entity.type
         self.initial_query = query
@@ -168,9 +170,7 @@ class QueryTransformer:
                 type_cls = "PropertyQueryColumn"
             except exc.InvalidRequestError:
                 pass
-        impl_cls = getattr(
-            columns, columns.query_columns.get(type_cls, 'BaseQueryColumn')
-        )
+        impl_cls = self.query_columns.get(type_cls, BaseQueryColumn)
         return impl_cls(self.cls, query).handle(column, value, func)
 
     def pop_pagination_kwargs(self, kwargs):

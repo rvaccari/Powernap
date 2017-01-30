@@ -49,7 +49,7 @@ class ApiResponse(object):
 
         :param results: The data that will be converted to a serializable
             format.  Dictionaries, Booleans, Integers, Strings, Tuples, &
-            other core datatypes are immediately returned.
+            other powernap datatypes are immediately returned.
 
             Both :class:`flask_sqlalchemy.Pagination` that contain db objs
             and lists that contain Lists that contain db objs are
@@ -167,11 +167,11 @@ def format_api_response(func, format_=True):
 
     Where `data` is json serializable and `status_code` is an integer
     Both arguments are passed to the
-    :class:`core.api.responses.ApiResponse` object before the final
+    :class:`powernap.api.responses.ApiResponse` object before the final
     response is sent from Flask.
     """
+    from powernap.auth.rate_limit import RateLimiter
     def _formatter(*args, **kwargs):
-        from core.shepherd.rate_limit import RateLimiter
 
         res = func(*args, **kwargs)
         if not format_:
