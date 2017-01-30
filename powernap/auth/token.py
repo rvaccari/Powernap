@@ -17,11 +17,11 @@ class TempToken(object):
 
     @property
     def token_data(self):
-        return {key: getattr(self, key) for key in TempToken.keys}
+        return {key: getattr(self, key) for key in TempToken.keys()}
 
     @classmethod
     def create(cls, user):
-        return cls(**{k: getattr(user, k) for k in TempToken.keys})
+        return cls(**{k: getattr(user, k) for k in TempToken.keys()})
 
     @classmethod
     def retrieve(cls, token, redis=None):
@@ -65,11 +65,12 @@ def make_hash(redis=None):
     raise Exception("Unable to generate unique hash.")
 
 
-def create_temp_token_from_hash_func(user, hash_func, **kwargs):
+def create_temp_token_from_hash_func(user, hash_func, temp_token_cls=None,
+                                     **kwargs):
     """Create expiring auth token in redis. `config['TOKEN_EXPIRE']`."""
     redis = redis_connection()
     token = hash_func(redis)
-    temp_token = TempToken.create(user)
+    temp_token = (temp_token_cls or TempToken).create(user)
     data = temp_token.token_data()
     data.update(kwargs)
     redis.hmset(token, data)
@@ -78,8 +79,9 @@ def create_temp_token_from_hash_func(user, hash_func, **kwargs):
     return token
 
 
-def create_temp_token(user, **kwargs):
-    return create_temp_token_from_hash_func(user, make_hash, **kwargs)
+def create_temp_token(user, temp_token_cls=None, **kwargs):
+    return create_temp_token_from_hash_func(
+        user, make_hash, temp_token_cls, **kwargs)
 
 
 def request_user_wrapper(f):
@@ -89,10 +91,10 @@ def request_user_wrapper(f):
     return inner
 
 
-def user_from_redis_token_wrapper(user_class):
+def user_from_redis_token_wrapper(user_class, temp_token_cls=None):
     def user_from_redis_token(token, redis=None):
         redis = redis if redis else redis_connection()
-        temp_token = TempToken.retrieve(token)
+        temp_token = (temp_token_cls or TempToken).retrieve(token)
         pk = getattr(temp_token, current_app.config["active_tokens_attr"])
         return user_class.query.get(pk)
     return user_from_redis_token

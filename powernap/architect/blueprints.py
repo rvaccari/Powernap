@@ -34,7 +34,7 @@ class Architect:
     def __init__(self, version=1, prefix=None, base_dir="", template_dir="",
                  name="architect", response_blueprint=None,
                  route_decorator_func=None, login_manager=None, user_class=None,
-                 user_loader=None, temp_token_class=None, api_encoder=None,
+                 user_loader=None, api_encoder=None,
                  before_request_funcs=None, after_request_funcs=None):
         """
         :param version: (int) version number for endpoints registerd with this
@@ -56,8 +56,6 @@ class Architect:
             used to set current_user value.
         :param user_class: (class): Class that `user_from_redis_token` should
             return an instance of for the `current_user`.
-        :param temp_token_class: (class): Class to be used as a wrapper around
-            the temporary token data from redis.abs
         :param user_loader: (func): function for
             `login_manager.requreset_loader`
         :param api_encoder: (class): Json encoder to be used by the application.
@@ -76,21 +74,18 @@ class Architect:
             v: None for v in ("GET", "GET ONE", "PUT", "POST", "DELETE")
         }
         self.route_decorator_func = route_decorator_func or (lambda x: x)
-        self._init_login_manager(
-            login_manager, user_loader, user_class, temp_token_class)
+        self._init_login_manager(login_manager, user_loader, user_class)
         self.api_encoder = api_encoder or APIEncoder
         self.before_request_funcs = before_request_funcs or [check_rate_limit]
         self.after_request_funcs = after_request_funcs or []
 
-    def _init_login_manager(self, login_manager, user_loader, user_class,
-                            temp_token_class):
+    def _init_login_manager(self, login_manager, user_loader, user_class):
         if not user_loader and not user_class:
             raise Exception(
                 'Define either the "user_loader" or "user_class" kwarg.')
         user_loader = user_loader or user_from_redis_token_wrapper(user_class)
         self.login_manager = login_manager or LoginManager()
         self.login_manager.request_loader(request_user_wrapper(user_loader))
-        self.temp_token_clas = temp_token_class
 
     def init_app(self, app):
         with app.app_context():
