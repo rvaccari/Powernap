@@ -51,12 +51,19 @@ class BaseQueryColumn(object, metaclass=_QueryMeta):
         return self.handle_method(column, value, func)
 
     def handle_method(self, column, value, func):
-        """Updates query with `func` from :module:`core.mason.methods`."""
-        from core.mason import methods
+        """Updates query with `func` from :module:`powernap.query.methods`."""
+        from powernap.query import methods
         func = func or "filter_by"
         if func in self.invalid:
             methods.raise_error(keys=func)
-        return getattr(methods, func)(self.cls, self.query, column, value)
+        func = getattr(methods, func)
+        return self.execute_method(func, self.cls, self.query, column, value)
+
+    def execute_method(func, cls, query, column, value):
+        decorator = current_app.config.get("QUERY_METHOD_DECORATOR")
+        if decorator:
+            func = decorator(func)
+        return func(cls, query, column, value)
 
 
 class IntegerQueryColumn(BaseQueryColumn):

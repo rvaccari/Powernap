@@ -22,10 +22,11 @@ def decode_value(val):
     return val.decode('utf-8') if isinstance(val, bytes) else val
 
 
-def redis_connection(db):
+def redis_connection(db=None):
     settings = current_app.config['REDIS']
     if db is not None:
         settings['db'] = db
     pool = ConnectionPool(**settings)
-    cls = DecodedRedis if current_app.config["DECODE_REDIS_BYTES"] else Redis
+    decode_bytes = current_app.config.get("DECODE_REDIS_BYTES", True)
+    cls = DecodedRedis if decode_bytes else Redis
     return cls(connection_pool=pool, decode_responses=True)
