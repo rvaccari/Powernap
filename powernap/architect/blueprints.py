@@ -48,7 +48,7 @@ class Architect:
         :param name: (string) a name for this architect
         :param response_blueprint: (class): class used for flask blueprints.
             Must inherit from `ResponseBlueprint`.
-        :param route_decorator_func: (function): receives and returns a list
+        :param route_decorator_funcs: (function): receives and returns a list
             of decorators that will be applied to an endpoint. This function
             can be used to override, add to, or subtract from the default
             decorators applied to endpoints.
@@ -93,13 +93,14 @@ class Architect:
         self.temp_token_clas = temp_token_class
 
     def init_app(self, app):
-        app.json_encoder = self.api_encoder
-        self.login_manager.init_app(app)
-        app.register_blueprint(self)
-        app.request_class = ApiRequest
-        app.register_error_handler(ApiError, api_error)
-        app.register_error_handler(404, api_error)
-        init_cors(app)
+        with app.app_context():
+            app.json_encoder = self.api_encoder
+            self.login_manager.init_app(app)
+            app.register_blueprint(self)
+            app.request_class = ApiRequest
+            app.register_error_handler(ApiError, api_error)
+            app.register_error_handler(404, api_error)
+            init_cors(app)
 
     @property
     def crudify_funcs(self):
@@ -108,14 +109,6 @@ class Architect:
     @crudify_funcs.setter
     def crudify_funcs(self, **kwargs):
         self.crudify_funcs.update(kwargs)
-
-    @property
-    def custom_route_decorators(self):
-        return self._route_decorators
-
-    @custom_route_decorators.setter
-    def custom_route_decorators(self, value):
-        self._route_decorators = value
 
     @property
     def prefix(self):
@@ -131,13 +124,12 @@ class Architect:
             'url_prefix': "/".join((self.prefix, url_prefix)),
             'template_folder': self.template_dir,
             "crudify_funcs": self.crudify_funcs,
-            "custom_route_decorators": self.custom_route_decorators,
         })
         blueprint = self.response_blueprint(name, **kwargs)
-        blueprint.decorators = self.update_route_decorators(blueprint)
-        for func in self.before_request_methods:
+        blueprint.decorators = self.update_route_decorators()
+        for func in self.before_request_funcs:
             blueprint.before_request(func)
-        for func in self.after_request_methods:
+        for func in self.after_request_funcs:
             blueprint.after_request(func)
         self.blueprints.append(blueprint)
         return blueprint
@@ -148,17 +140,18 @@ class Architect:
 
     @property
     def default_decorators(self):
+        """Default decorators for each endpoint (kwarg, func, default value)."""
         return [
-            ("public", require_public),
-            ("login", require_login),
-            ("permissions", require_permissions),
-            ("format_", format_api_response),
+            ("public", require_public, False),
+            ("login", require_login, True),
+            ("permissions", require_permissions, {}),
+            ("format_", format_api_response, True),
         ]
 
     def register(self, app, options, first_registration):
         init_view_modules(self.base_dir)
         for blueprint in self.blueprints:
-            app.register_blueprint(blueprint, **blueprint.options)
+            app.register_blueprint(blueprint, **options)
 
 
 class ResponseBlueprint(Blueprint):
@@ -172,15 +165,6 @@ class ResponseBlueprint(Blueprint):
         self.public = public
         self._route_decorators = []
         self.crudify_funcs = crudify_funcs
-        self._decorators = []
-
-    @property
-    def decorators(self):
-        return self._decorators
-
-    @decorators.setter
-    def decorators(self, value):
-        self._decorators = value
 
     def route(self, rule, **options):
         """Wrap view with api response decorators, make `self.link`."""
@@ -193,13 +177,14 @@ class ResponseBlueprint(Blueprint):
 
         def decorator(f):
             endpoint = options.pop("endpoint", f.__name__)
-            for name, decorator in self.decorators:
-                f = decorator(f, options.pop(name))
+            for name, decorator, default_value in self.decorators:
+                f = decorator(f, options.pop(name, default_value))
             options.update(self.default_route_options)
             self.add_url_rule(rule, endpoint, f, **options)
             return f
         return decorator
 
+    @property
     def default_route_options(self):
         return {"strict_slashes": False}
 
@@ -255,11 +240,11 @@ class ResponseBlueprint(Blueprint):
             return empty_success_code
 
         funcs = (
-            ("GET", self.crudify_funcs.get("GET", get_func)),
-            ("GET ONE", self.crudify_funcs.get("GET ONE", get_one_func)),
-            ("POST", self.crudify_funcs.get("POST", post_func)),
-            ("PUT", self.crudify_funcs.get("PUT", put_func)),
-            ("DELETE", self.crudify_funcs.get("DELETE", delete_func)),
+            ("GET", self.crudify_funcs.get("GET") or get_func),
+            ("GET ONE", self.crudify_funcs.get("GET ONE") or get_one_func),
+            ("POST", self.crudify_funcs.get("POST") or post_func),
+            ("PUT", self.crudify_funcs.get("PUT") or put_func),
+            ("DELETE", self.crudify_funcs.get("DELETE") or delete_func),
         )
 
         for method, func in funcs:

@@ -65,15 +65,21 @@ def make_hash(redis=None):
     raise Exception("Unable to generate unique hash.")
 
 
-def create_temp_token(user, hash_func):
+def create_temp_token_from_hash_func(user, hash_func, **kwargs):
     """Create expiring auth token in redis. `config['TOKEN_EXPIRE']`."""
     redis = redis_connection()
     token = hash_func(redis)
     temp_token = TempToken.create(user)
-    redis.hmset(token, temp_token.token_data())
+    data = temp_token.token_data()
+    data.update(kwargs)
+    redis.hmset(token, data)
     redis.sadd(active_tokens_key(user), token)
     redis.expire(token, current_app.config['TOKEN_EXPIRE'])
     return token
+
+
+def create_temp_token(user, **kwargs):
+    return create_temp_token_from_hash_func(user, make_hash, **kwargs)
 
 
 def request_user_wrapper(f):
