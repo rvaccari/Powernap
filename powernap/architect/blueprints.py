@@ -1,4 +1,5 @@
 import inspect
+from copy import deepcopy
 
 from flask import Blueprint, current_app, request
 from flask_login import LoginManager
@@ -115,13 +116,16 @@ class Architect:
 
         Should only be invoked in the top of files named `views.py`.
         """
+        default_options = {k: kwargs.pop(k) for k in self.option_keys
+                           if k in kwargs}
         kwargs.update({
-            'url_prefix': "/".join((self.prefix, url_prefix)),
+            'url_prefix': "{}{}".format(self.prefix, url_prefix),
             'template_folder': self.template_dir,
             "crudify_funcs": self.crudify_funcs,
         })
-        blueprint = self.response_blueprint(name, **kwargs)
-        blueprint.decorators = self.update_route_decorators()
+        blueprint = self.response_blueprint(
+            name, default_options=default_options, **kwargs)
+        blueprint.decorators = self.route_decorators
         for func in self.before_request_funcs:
             blueprint.before_request(func)
         for func in self.after_request_funcs:
@@ -129,7 +133,12 @@ class Architect:
         self.blueprints.append(blueprint)
         return blueprint
 
-    def update_route_decorators(self):
+    @property
+    def option_keys(self):
+        return [k for k, _, _ in self.route_decorators]
+
+    @property
+    def route_decorators(self):
         """Pass a function to update the decorated routes."""
         return self.route_decorator_func(self.default_decorators)
 
@@ -154,12 +163,12 @@ class ResponseBlueprint(Blueprint):
     links = []
     cors_rules = []
 
-    def __init__(self, name, import_name='', public=False, crudify_funcs={},
-                 **kwargs):
+    def __init__(self, name, import_name='', crudify_funcs=None,
+                 default_options=None, **kwargs):
         super(ResponseBlueprint, self).__init__(name, import_name, **kwargs)
-        self.public = public
         self._route_decorators = []
-        self.crudify_funcs = crudify_funcs
+        self.crudify_funcs = crudify_funcs or {}
+        self.default_options = default_options or {}
 
     def route(self, rule, **options):
         """Wrap view with api response decorators, make `self.link`."""
@@ -170,14 +179,21 @@ class ResponseBlueprint(Blueprint):
             del link['permissions']
         self.links.append(link)
 
+        route_options = self.route_options(options)
+
         def decorator(f):
             endpoint = options.pop("endpoint", f.__name__)
             for name, decorator, default_value in self.decorators:
-                f = decorator(f, options.pop(name, default_value))
-            options.update(self.default_route_options)
-            self.add_url_rule(rule, endpoint, f, **options)
+                f = decorator(f, route_options.pop(name, default_value))
+            route_options.update(self.default_route_options)
+            self.add_url_rule(rule, endpoint, f, **route_options)
             return f
         return decorator
+
+    def route_options(self, options):
+        complete = deepcopy(self.default_options)
+        complete.update(options)
+        return complete
 
     @property
     def default_route_options(self):
