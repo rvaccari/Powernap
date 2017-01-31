@@ -144,12 +144,15 @@ class Architect:
 
     @property
     def default_decorators(self):
-        """Default decorators for each endpoint (kwarg, func, default value)."""
+        """Default decorators for each endpoint (kwarg, func, default value).
+
+        The last item in the list is the last decorator.
+        """
         return [
-            ("public", require_public, False),
-            ("login", require_login, True),
-            ("permissions", require_permissions, {}),
             ("format_", format_api_response, True),
+            ("permissions", require_permissions, {}),
+            ("login", require_login, True),
+            ("public", require_public, False),
         ]
 
     def register(self, app, options, first_registration):

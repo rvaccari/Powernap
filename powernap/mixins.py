@@ -2,15 +2,12 @@ import sqlalchemy
 from flask import current_app
 from flask.ext.sqlalchemy import BaseQuery
 from flask_login import current_user
-from sqlalchemy.orm.session import make_transient
-from sqlalchemy.sql import func
 
 from powernap.exceptions import OwnerError
 
 
 class PowernapMixin(object):
     query_class = BaseQuery
-    timestamp_fields = []
     exposed_fields = []
 
     def session(self):
@@ -66,33 +63,12 @@ class PowernapMixin(object):
         instance.save()
         return instance
 
-    def make_transient(self):
-        """Disconnects the current instance from its row in the database.
-
-        Useful for copying a instance quickly.
-        Be sure to update the id field!
-        Check out :meth:`next_primary_key`.
-        """
-        self.session().expunge(self)
-        make_transient(self)
-
-    @classmethod
-    def next_primary_key(cls):
-        return cls.query.session()(func.max(cls.id).label("id")).one().id
-
-    def encode_byte_fields(self):
-        for column in self.__table__.columns:
-            if str(column.type).startswith("VARBINARY"):
-                field = column.key
-                val = getattr(self, field)
-                if not isinstance(val, bytes):
-                    setattr(self, field, str.encode(val))
-
     def confirm_owner(self, throw=True):
-        key = current_app.config["ACTIVE_TOKENS_ATTR"]
-        current_user_id = getattr(current_user, key)
-        instance_id = getattr(self, key)
-        is_owner = current_user_id != instance_id
+        client_key = current_app.config.get("ACTIVE_TOKENS_ATTR", "id")
+        db_entry_key = current_app.config.get("DB_ENTRY_ATTR", "id")
+        current_user_id = getattr(current_user, client_key)
+        instance_id = getattr(self, db_entry_key)
+        is_owner = current_user_id == instance_id
         if not is_owner and throw:
             raise OwnerError
         return is_owner

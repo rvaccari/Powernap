@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from flask import current_app
 from sqlalchemy.sql.sqltypes import Boolean, Integer, String, DateTime
 
 from powernap.exceptions import InvalidFormError
@@ -59,7 +60,7 @@ class BaseQueryColumn(object, metaclass=_QueryMeta):
         func = getattr(methods, func)
         return self.execute_method(func, self.cls, self.query, column, value)
 
-    def execute_method(func, cls, query, column, value):
+    def execute_method(self, func, cls, query, column, value):
         decorator = current_app.config.get("QUERY_METHOD_DECORATOR")
         if decorator:
             func = decorator(func)

@@ -116,3 +116,13 @@ def lte(cls, query, column, value):
 def like(cls, query, column, value):
     """Return sql `like` query."""
     return query.filter(getattr(cls, column).like(value))
+
+
+def max(cls, query, column, value):
+    """Return sql `MAX` query."""
+    return query(func.max(column))
+
+
+def min(cls, query, column, value):
+    """Return sql `MIN` query."""
+    return query(func.min(column))

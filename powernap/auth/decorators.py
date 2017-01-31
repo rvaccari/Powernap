@@ -12,18 +12,20 @@ def require_public(func, public=False):
     return _formatter
 
 
-def require_permissions(func, permissions=None):
-    def _formatter(*args, **kwargs):
-        if permissions and not getattr(current_user, 'is_admin', False):
-            if not current_user.has_permission(permissions):
-                raise PermissionError(description={'permissions': permissions})
-        return func(*args, **kwargs)
-    return _formatter
-
-
 def require_login(func, login=True):
     def _formatter(*args, **kwargs):
         if login and not current_user.is_authenticated():
             raise UnauthorizedError
+        return func(*args, **kwargs)
+    return _formatter
+
+
+def require_permissions(func, permissions=None):
+    def _formatter(*args, **kwargs):
+        if permissions and not getattr(current_user, 'is_admin', False):
+            # TODO: implement the actual permissions functionality.
+            pass
+            #if not current_user.has_permission("generic name", permissions):
+            #    raise PermissionError(description={'permissions': permissions})
         return func(*args, **kwargs)
     return _formatter
