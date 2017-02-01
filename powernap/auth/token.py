@@ -44,8 +44,8 @@ class TempToken(object):
 
 
 def active_tokens_key(user):
-    prefix_key = (current_app.config.get("ACTIVE_TOKENS_PREFIX") or "active")
-    prefix = getattr(user, prefix_key)
+    prefix_key = current_app.config.get("ACTIVE_TOKENS_PREFIX")
+    prefix = getattr(user, prefix_key) if prefix_key else "active"
     attr_val = getattr(user, current_app.config["ACTIVE_TOKENS_ATTR"])
     return '{}:{}'.format(prefix, attr_val)
 
@@ -72,7 +72,7 @@ def create_temp_token_from_hash_func(user, hash_func, temp_token_cls=None,
     redis = redis_connection()
     token = hash_func(redis)
     temp_token = (temp_token_cls or TempToken).create(user)
-    data = temp_token.token_data()
+    data = temp_token.token_data
     data.update(kwargs)
     redis.hmset(token, data)
     redis.sadd(active_tokens_key(user), token)
