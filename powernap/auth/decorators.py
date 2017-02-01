@@ -1,3 +1,4 @@
+import bleach
 from flask import abort, current_app
 from flask_login import current_user
 
@@ -28,4 +29,17 @@ def require_permissions(func, permissions=None):
             #if not current_user.has_permission("generic name", permissions):
             #    raise PermissionError(description={'permissions': permissions})
         return func(*args, **kwargs)
+    return _formatter
+
+
+def safe_response(func, safe=False):
+    def _formatter(*args, **kwargs):
+        res = func(*args, **kwargs)
+        if not safe:
+            clean = lambda res: res.set_data(bleach.clean(res.get_data()))
+            if isinstance(res, (tuple)):
+                clean(res[0])
+            else:
+                clean(res)
+        return res
     return _formatter

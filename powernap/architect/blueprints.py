@@ -11,6 +11,7 @@ from powernap.auth.decorators import (
     require_login,
     require_permissions,
     require_public,
+    safe_response,
 )
 from powernap.auth.rate_limit import check_rate_limit
 from powernap.auth.token import (
@@ -150,6 +151,7 @@ class Architect:
         """
         return [
             ("format_", format_api_response, True),
+            ("safe", safe_response, False),
             ("permissions", require_permissions, {}),
             ("login", require_login, True),
             ("public", require_public, False),
