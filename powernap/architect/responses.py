@@ -9,6 +9,7 @@ from flask_sqlalchemy import Pagination
 
 
 class APIEncoder(json.JSONEncoder):
+    """Allows json.dumps to accept classses with api_respones method."""
     def default(self, o):
         if isinstance(o, Decimal):
             return float(o)

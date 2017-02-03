@@ -6,6 +6,7 @@ from powernap.exceptions import PermissionError, UnauthorizedError
 
 
 def public(func, public=False):
+    """Identifies endpoints that are non-public and only available to admins."""
     def _formatter(*args, **kwargs):
         if not public and not getattr(current_user, 'is_admin', False):
             abort(503 if current_app.config["DEBUG"] else 404)
@@ -14,6 +15,7 @@ def public(func, public=False):
 
 
 def login(func, login=True):
+    """Identifies public endpoints that do not require authenticated users."""
     def _formatter(*args, **kwargs):
         if login and not current_user.is_authenticated():
             raise UnauthorizedError
@@ -22,6 +24,7 @@ def login(func, login=True):
 
 
 def needs_permission(func, needs_permission=False):
+    """Identifies endpoints that require the user to have permisssion."""
     def _formatter(*args, **kwargs):
         if needs_permission and not getattr(current_user, 'is_admin', False):
             if not current_user.has_permission():
@@ -32,6 +35,7 @@ def needs_permission(func, needs_permission=False):
 
 
 def safe(func, safe=False):
+    """Identifies endpoints that don't require sanitization of response data."""
     def _formatter(*args, **kwargs):
         res = func(*args, **kwargs)
         if not safe:

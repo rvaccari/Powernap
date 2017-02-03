@@ -1,4 +1,5 @@
 def init_cors(app):
+    """Allow intial pre-flight "OPTIONS" request globally on app."""
     @app.after_request
     def add_cors(resp):
         from flask import request

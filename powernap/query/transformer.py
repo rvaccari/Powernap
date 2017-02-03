@@ -5,6 +5,7 @@ from flask_login import current_user
 from sqlalchemy import exc
 
 from powernap.exceptions import InvalidFormError
+from powernap.helpers import load_from_string
 from powernap.query.columns import BaseQueryColumn, QUERY_COLUMNS
 
 
@@ -12,8 +13,8 @@ def construct_query(cls, enforce_owner=True, **kwargs):
     """Return :class:`flask_sqlalchemy.Pagination` object from kwargs.
 
     :param cls: Target SQLA model for query_construction.
-    :param enforce_owner: Ensures `client_id` in the query is set to
-        the `current_user`'s client id.
+    :param enforce_owner: Ensures `id` in the query is set to
+        the `current_user`'s id.
     :param kwargs: Kwargs to overide the query_args passed to
         :meth:`.QueryTransformer.transform`.
     """
@@ -26,8 +27,8 @@ def extend_query(query, enforce_owner=True, **kwargs):
     """Return :class:`flask_sqlalchemy.Pagination` object from kwargs.
 
     :param query: A query on an object.
-    :param enforce_owner: Ensures `client_id` in the query is set to
-        the `current_user`'s client id.
+    :param enforce_owner: Ensures `id` in the query is set to
+        the `current_user`'s id.
     :param kwargs: Kwargs to overide the query_args passed to
         :meth:`.QueryTransformer.transform`.
 
@@ -45,27 +46,24 @@ def get_query_args_for_cls(cls, enforce_owner=True, **kwargs):
     """Get the queryargs from the request and override them where needed.
 
     :param kwargs: kwargs to override the query args with.
-    :param enforce_owner: Ensures `client_id` in the query is set to
-        the `current_user`'s client id.
+    :param enforce_owner: Ensures `id` in the query is set to
+        the `current_user`'s id.
 
     This function serves as the primary means of ensuring query
-    construction is done using only the current_user's client id,
-    and in cases of admin's to allow overriding of their default
-    client_id of 0.
+    construction is done using only the current_user's id,
+    and in cases of admin's to prevent confirm_owner from raising errors.
     """
     args = request.args.to_dict()
-    if enforce_owner:
-        args = override_query_args(cls, args, **kwargs)
-    return args
+    args.update(kwargs)
+    return override_owner_id(cls, args) if enforce_owner else args
 
 
-def override_query_args(cls, query_args, **kwargs):
-    override_client_id = (not getattr(current_user, 'is_admin', False) and
-                          hasattr(cls, 'client_id') and
-                          hasattr(current_user, 'client_id'))
-    query_args.update(kwargs)
-    if override_client_id:
-        query_args["client_id"] = current_user.client_id
+def override_owner_id(cls, query_args):
+    """Used to ensure that users cannot query other users data."""
+    attr = current_app.config.get("ACTIVE_TOKENS_ATTR", "id")
+    if not getattr(current_user, 'is_admin', False) and hasattr(cls, attr) and \
+            hasattr(current_user, attr):
+        query_args[attr] = getattr(current_user, attr)
     return query_args
 
 

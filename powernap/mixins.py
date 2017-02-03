@@ -7,6 +7,10 @@ from powernap.exceptions import OwnerError
 
 
 class PowernapMixin(object):
+    """
+    Mixin that is required for any object that is returned throught the
+    `format_` decorator.
+    """
     query_class = BaseQuery
     exposed_fields = []
 

@@ -25,6 +25,7 @@ from powernap.query.transformer import construct_query
 
 @format_
 def api_error(e):
+    """Error handler that returns error dict with error msg."""
     desc = e.description
     if isinstance(desc, dict):
         content = desc
@@ -34,7 +35,7 @@ def api_error(e):
 
 
 class Architect:
-    "Registers multiple :class:`powernap.architect.blueprints.ResponseBlueprint`."
+    """Registers multiple ResponseBlueprints and initializes settings."""
     def __init__(
         self, version=1, name="architect", prefix=None, base_dir="",
         template_dir="", crudify_funcs={}, user_class="", user_loader="",
@@ -104,6 +105,7 @@ class Architect:
                                     for path in after_request_funcs]
 
     def _init_login_manager(self, login_manager, user_loader, user_class):
+        """Loads the flask_login manager with the user retrieval function."""
         if not user_loader and not user_class:
             raise Exception(
                 'Define either the "user_loader" or "user_class" kwarg.')
@@ -125,11 +127,13 @@ class Architect:
 
     @property
     def prefix(self):
+        """Full prefix (including version number) passed to sub blueprint."""
         prefix = self._prefix or current_app.config["API_URL_PREFIX"]
         return prefix.format(version=self.version)
 
     @property
     def decorator_names(self):
+        """Names of decorators applied to sub blueprint routes."""
         return [decorator.__name__ for decorator in self.decorators]
 
     def sub_blueprint(self, name, url_prefix='', **kwargs):
@@ -158,6 +162,7 @@ class Architect:
         return blueprint
 
     def register(self, app, options, first_registration):
+        """Register all the sub blueprints with the app."""
         init_view_modules(self.base_dir)
         for blueprint in self.blueprints:
             app.register_blueprint(blueprint, **options)
@@ -170,6 +175,15 @@ class ResponseBlueprint(Blueprint):
 
     def __init__(self, name, decorators, import_name='', crudify_funcs=None,
                  default_options=None, **kwargs):
+        """
+        :param name: (string): Name of blueprint.
+        :param decorators: (list): List of functions that will decorate routes.
+        :param import_name: (string): import name.
+        :param crudfiy_funcs: (dict): Key is a crudify method, value is a
+            function.
+        :param default_options: (dict): Dictionary with default values for
+            decorators on this blueprints routes.
+        """
         super(ResponseBlueprint, self).__init__(name, import_name, **kwargs)
         self.decorators = decorators
         self.crudify_funcs = crudify_funcs or {}
@@ -181,26 +195,28 @@ class ResponseBlueprint(Blueprint):
         link.update(options)
         self.links.append(link)
 
-        route_options = self.route_options(options)
+        options = self.options(options)
 
         def decorator(f):
             endpoint = options.pop("endpoint", f.__name__)
             for decorator in self.decorators:
-                v = route_options.pop(decorator.__name__, None)
+                v = options.pop(decorator.__name__, None)
                 args = [f] if v is None else [f, v]
                 f = decorator(*args)
-            route_options.update(self.default_route_options)
-            self.add_url_rule(rule, endpoint, f, **route_options)
+            options.update(self.default_route_options)
+            self.add_url_rule(rule, endpoint, f, **options)
             return f
         return decorator
 
-    def route_options(self, options):
+    def options(self, options):
+        """Return a complete list of options for route and decorators."""
         complete = deepcopy(self.default_options)
         complete.update(options)
         return complete
 
     @property
     def default_route_options(self):
+        """Return deffault options that will be passed to every route."""
         return {"strict_slashes": False}
 
     def crudify(self, url, model, create_form=None, update_form=None, ignore=[],
@@ -214,11 +230,11 @@ class ResponseBlueprint(Blueprint):
         :param ignore: Do not create endpoints for this list of methods.
         :param permissions: Dictionary of permissions for each method. Ex:
             permissions = {
-                "GET":     ['can_view'],
-                "GET ONE": ['can_view'],
-                "POST":    ['can_edit'],
-                "PUT":     ['can_edit'],
-                "DELETE":  ['can_edit'],
+                "GET":     False,
+                "GET ONE": False,
+                "POST":    True,
+                "PUT":     True,
+                "DELETE":  True,
             }
         """
         if not update_form:
@@ -269,6 +285,7 @@ class ResponseBlueprint(Blueprint):
 
     def route_crudify_method(self, url, model, method, func, needs_permission,
                              **kwargs):
+        """Adds the crudify methods as actual routes to the blueprint."""
         method_url = url
         func.__name__ = "{}_{}".format(method, model.__name__)
         needs_permission = needs_permission.get(method)
