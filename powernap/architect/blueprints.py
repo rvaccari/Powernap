@@ -1,3 +1,4 @@
+import importlib
 import inspect
 from copy import deepcopy
 
@@ -6,20 +7,15 @@ from flask_login import LoginManager
 
 from powernap.architect.loaders import init_view_modules
 from powernap.architect.requests import ApiRequest
-from powernap.architect.responses import format_api_response, APIEncoder
-from powernap.auth.decorators import (
-    require_login,
-    require_permission,
-    require_public,
-    safe_response,
-)
+from powernap.architect.responses import APIEncoder
 from powernap.auth.rate_limit import check_rate_limit
 from powernap.auth.token import (
     user_from_redis_token_wrapper,
     request_user_wrapper,
 )
 from powernap.cors import init_cors
-from powernap.exceptions import ApiError, api_error
+from powernap.decorators import format_
+from powernap.exceptions import ApiError
 from powernap.http_codes import (
     empty_success_code,
     error_code,
@@ -29,31 +25,39 @@ from powernap.http_codes import (
 from powernap.query.transformer import construct_query
 
 
+@format_
+def api_error(e):
+    desc = e.description
+    if isinstance(desc, dict):
+        content = desc
+    else:
+        content = {"errors": [desc]}
+    return content, e.code
+
+
 class Architect:
     "Registers multiple :class:`powernap.architect.blueprints.ResponseBlueprint`."
-    blueprints = []
-
-    def __init__(self, version=1, prefix=None, base_dir="", template_dir="",
-                 name="architect", response_blueprint=None,
-                 route_decorator_func=None, login_manager=None, user_class=None,
-                 user_loader=None, api_encoder=None,
-                 before_request_funcs=None, after_request_funcs=None):
+    def __init__(self, version=1, prefix=None, decorators=None, base_dir="",
+                 template_dir="", name="architect", response_blueprint=None,
+                 crudify_funcs={}, login_manager=None, user_class=None,
+                 user_loader=None, api_encoder=None, before_request_funcs=[],
+                 after_request_funcs=[]):
         """
-        :param version: (int) version number for endpoints registerd with this
+        :param version: (int): version number for endpoints registerd with this
             architect.
-        :param prefix: (string) a url prefix to append to all endpoints.
+        :param prefix: (string): a url prefix to append to all endpoints.
             Requires '{}' to format in the version number. If not provided
             `current_app.config["API_URL_PREFIX"] will be used.
-        :param base_dir: (string) the full path of the base directory of the
+        :param decorators: (list): List of strings containing paths to
+            functions that will decorate every route.
+        :param base_dir: (string): the full path of the base directory of the
             Flask application.
         :param template_dir: (string) the full path of the template directory
         :param name: (string) a name for this architect
         :param response_blueprint: (class): class used for flask blueprints.
             Must inherit from `ResponseBlueprint`.
-        :param route_decorator_funcs: (function): receives and returns a list
-            of decorators that will be applied to an endpoint. This function
-            can be used to override, add to, or subtract from the default
-            decorators applied to endpoints.
+        :param crudify_funcs: (dict): keys are crudify request types keys
+            are functions that are used for crudifying.
         :param login_manager: (class): Instance of `flask_login.LoginManager`
             used to set current_user value.
         :param user_class: (class): Class that `user_from_redis_token` should
@@ -66,16 +70,18 @@ class Architect:
         :param after_request_funcs: (list): List of functions to run
             after requests.
         """
+        self.blueprints = []
         self.version = version
         self._prefix = prefix
+        self.decorators = self._load_decorators(decorators)
         self.base_dir = base_dir
         self.template_dir = template_dir
         self.name = name
         self.response_blueprint = response_blueprint or ResponseBlueprint
-        self._crudify_funcs = {
-            v: None for v in ("GET", "GET ONE", "PUT", "POST", "DELETE")
+        self.crudify_funcs = {
+            k: crudify_funcs.get(k)
+            for k in ("GET", "GET ONE", "PUT", "POST", "DELETE")
         }
-        self.route_decorator_func = route_decorator_func or (lambda x: x)
         self._init_login_manager(login_manager, user_loader, user_class)
         self.api_encoder = api_encoder or APIEncoder
         self.before_request_funcs = before_request_funcs or [check_rate_limit]
@@ -89,6 +95,14 @@ class Architect:
         self.login_manager = login_manager or LoginManager()
         self.login_manager.request_loader(request_user_wrapper(user_loader))
 
+    def _load_decorators(self, decorator_paths):
+        decorators = []
+        for path in decorator_paths:
+            module, decorator_name = path.rsplit(".", 1)
+            decorator = getattr(importlib.import_module(module), decorator_name)
+            decorators.append(decorator)
+        return decorators
+
     def init_app(self, app):
         with app.app_context():
             app.json_encoder = self.api_encoder
@@ -100,62 +114,38 @@ class Architect:
             init_cors(app)
 
     @property
-    def crudify_funcs(self):
-        return self._crudify_funcs
-
-    @crudify_funcs.setter
-    def crudify_funcs(self, **kwargs):
-        self.crudify_funcs.update(kwargs)
-
-    @property
     def prefix(self):
         prefix = self._prefix or current_app.config["API_URL_PREFIX"]
         return prefix.format(version=self.version)
+
+    @property
+    def decorator_names(self):
+        return [decorator.__name__ for decorator in self.decorators]
 
     def sub_blueprint(self, name, url_prefix='', **kwargs):
         """Create a new Blueprint for the Architect to register.
 
         Should only be invoked in the top of files named `views.py`.
         """
-        default_options = {k: kwargs.pop(k) for k in self.option_keys
+        default_options = {k: kwargs.pop(k) for k in self.decorator_names
                            if k in kwargs}
-        kwargs.update({
+        defaults = {
             'url_prefix': "{}{}".format(self.prefix, url_prefix),
             'template_folder': self.template_dir,
             "crudify_funcs": self.crudify_funcs,
-        })
+        }
+        for k, v in defaults.items():
+            if k not in kwargs:
+                kwargs[k] = v
+
         blueprint = self.response_blueprint(
-            name, default_options=default_options, **kwargs)
-        blueprint.decorators = self.route_decorators
+            name, self.decorators, default_options=default_options, **kwargs)
         for func in self.before_request_funcs:
             blueprint.before_request(func)
         for func in self.after_request_funcs:
             blueprint.after_request(func)
         self.blueprints.append(blueprint)
         return blueprint
-
-    @property
-    def option_keys(self):
-        return [k for k, _, _ in self.route_decorators]
-
-    @property
-    def route_decorators(self):
-        """Pass a function to update the decorated routes."""
-        return self.route_decorator_func(self.default_decorators)
-
-    @property
-    def default_decorators(self):
-        """Default decorators for each endpoint (kwarg, func, default value).
-
-        The last item in the list is the last decorator.
-        """
-        return [
-            ("format_", format_api_response, True),
-            ("safe", safe_response, False),
-            ("needs_permission", require_permission, False),
-            ("login", require_login, True),
-            ("public", require_public, False),
-        ]
 
     def register(self, app, options, first_registration):
         init_view_modules(self.base_dir)
@@ -168,10 +158,10 @@ class ResponseBlueprint(Blueprint):
     links = []
     cors_rules = []
 
-    def __init__(self, name, import_name='', crudify_funcs=None,
+    def __init__(self, name, decorators, import_name='', crudify_funcs=None,
                  default_options=None, **kwargs):
         super(ResponseBlueprint, self).__init__(name, import_name, **kwargs)
-        self._route_decorators = []
+        self.decorators = decorators
         self.crudify_funcs = crudify_funcs or {}
         self.default_options = default_options or {}
 
@@ -185,8 +175,10 @@ class ResponseBlueprint(Blueprint):
 
         def decorator(f):
             endpoint = options.pop("endpoint", f.__name__)
-            for name, decorator, default_value in self.decorators:
-                f = decorator(f, route_options.pop(name, default_value))
+            for decorator in self.decorators:
+                v = route_options.pop(decorator.__name__, None)
+                args = [f] if v is None else [f, v]
+                f = decorator(*args)
             route_options.update(self.default_route_options)
             self.add_url_rule(rule, endpoint, f, **route_options)
             return f

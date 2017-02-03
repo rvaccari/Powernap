@@ -157,36 +157,3 @@ class ApiResponse(object):
         """
         logging.warning("Bad Admin Request to '{}': {}".format(
             request.path, data))
-
-
-def format_api_response(func, format_=True):
-    """Decorator to format return values into api responses.
-
-    Functions with this decorator can do this:
-        `return data, status_code`
-
-    Where `data` is json serializable and `status_code` is an integer
-    Both arguments are passed to the
-    :class:`powernap.api.responses.ApiResponse` object before the final
-    response is sent from Flask.
-    """
-    from powernap.auth.rate_limit import RateLimiter
-    def _formatter(*args, **kwargs):
-
-        res = func(*args, **kwargs)
-        if not format_:
-            return res
-
-        if isinstance(res, tuple):
-            data, status_code = res
-        elif isinstance(res, int):
-            data = None
-            status_code = res
-        else:
-            raise Exception("Invalid Response Type: {}".format(type(res)))
-
-        rl = RateLimiter(current_user)
-        headers = rl.headers()
-
-        return ApiResponse(data, status_code, headers).response
-    return _formatter

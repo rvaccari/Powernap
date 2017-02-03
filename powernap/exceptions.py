@@ -1,4 +1,3 @@
-from powernap.architect.responses import format_api_response
 from powernap.http_codes import (
     error_code,
     not_found_code,
@@ -61,14 +60,3 @@ class UnauthorizedError(ApiError):
 class UbersmithAPIError(ApiError):
     """Raise when a ResponseError is raised by the ubersmith API."""
     code = error_code
-
-
-@format_api_response
-def api_error(e):
-    desc = e.description
-    if isinstance(desc, dict):
-        content = desc
-    else:
-        content = {"errors": [desc]}
-
-    return content, e.code

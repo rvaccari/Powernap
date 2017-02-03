@@ -5,7 +5,7 @@ from flask_login import current_user
 from powernap.exceptions import PermissionError, UnauthorizedError
 
 
-def require_public(func, public=False):
+def public(func, public=False):
     def _formatter(*args, **kwargs):
         if not public and not getattr(current_user, 'is_admin', False):
             abort(503 if current_app.config["DEBUG"] else 404)
@@ -13,7 +13,7 @@ def require_public(func, public=False):
     return _formatter
 
 
-def require_login(func, login=True):
+def login(func, login=True):
     def _formatter(*args, **kwargs):
         if login and not current_user.is_authenticated():
             raise UnauthorizedError
@@ -21,7 +21,7 @@ def require_login(func, login=True):
     return _formatter
 
 
-def require_permission(func, needs_permission=False):
+def needs_permission(func, needs_permission=False):
     def _formatter(*args, **kwargs):
         if needs_permission and not getattr(current_user, 'is_admin', False):
             if not current_user.has_permission():
@@ -31,7 +31,7 @@ def require_permission(func, needs_permission=False):
     return _formatter
 
 
-def safe_response(func, safe=False):
+def safe(func, safe=False):
     def _formatter(*args, **kwargs):
         res = func(*args, **kwargs)
         if not safe:
@@ -41,4 +41,38 @@ def safe_response(func, safe=False):
             else:
                 clean(res)
         return res
+    return _formatter
+
+
+def format_(func, format_=True):
+    """Decorator to format return values into api responses.
+
+    Functions with this decorator can do this:
+        `return data, status_code`
+
+    Where `data` is json serializable and `status_code` is an integer
+    Both arguments are passed to the
+    :class:`powernap.api.responses.ApiResponse` object before the final
+    response is sent from Flask.
+    """
+    def _formatter(*args, **kwargs):
+        from powernap.architect.responses import ApiResponse
+        from powernap.auth.rate_limit import RateLimiter
+
+        res = func(*args, **kwargs)
+        if not format_:
+            return res
+
+        if isinstance(res, tuple):
+            data, status_code = res
+        elif isinstance(res, int):
+            data = None
+            status_code = res
+        else:
+            raise Exception("Invalid Response Type: {}".format(type(res)))
+
+        rl = RateLimiter(current_user)
+        headers = rl.headers()
+
+        return ApiResponse(data, status_code, headers).response
     return _formatter
