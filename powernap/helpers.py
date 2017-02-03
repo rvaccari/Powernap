@@ -1,3 +1,5 @@
+import importlib
+
 from redis import Redis, ConnectionPool
 from flask import current_app
 
@@ -30,3 +32,8 @@ def redis_connection(db=None):
     decode_bytes = current_app.config.get("DECODE_REDIS_BYTES", True)
     cls = DecodedRedis if decode_bytes else Redis
     return cls(connection_pool=pool, decode_responses=True)
+
+
+def load_from_string(path):
+    module, decorator_name = path.rsplit(".", 1)
+    return getattr(importlib.import_module(module), decorator_name)

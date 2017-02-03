@@ -1,4 +1,3 @@
-import importlib
 import inspect
 from copy import deepcopy
 
@@ -6,8 +5,6 @@ from flask import Blueprint, current_app, request
 from flask_login import LoginManager
 
 from powernap.architect.loaders import init_view_modules
-from powernap.architect.requests import ApiRequest
-from powernap.architect.responses import APIEncoder
 from powernap.auth.rate_limit import check_rate_limit
 from powernap.auth.token import (
     user_from_redis_token_wrapper,
@@ -16,6 +13,7 @@ from powernap.auth.token import (
 from powernap.cors import init_cors
 from powernap.decorators import format_
 from powernap.exceptions import ApiError
+from powernap.helpers import load_from_string
 from powernap.http_codes import (
     empty_success_code,
     error_code,
@@ -37,14 +35,27 @@ def api_error(e):
 
 class Architect:
     "Registers multiple :class:`powernap.architect.blueprints.ResponseBlueprint`."
-    def __init__(self, version=1, prefix=None, decorators=None, base_dir="",
-                 template_dir="", name="architect", response_blueprint=None,
-                 crudify_funcs={}, login_manager=None, user_class=None,
-                 user_loader=None, api_encoder=None, before_request_funcs=[],
-                 after_request_funcs=[]):
+    def __init__(
+        self, version=1, name="architect", prefix=None, base_dir="",
+        template_dir="", crudify_funcs={}, user_class="", user_loader="",
+        login_manager="flask_login.LoginManager",
+        decorators=[
+            "powernap.decorators.format_",
+            "powernap.decorators.safe",
+            "core.otp.decorators.otp",
+            "powernap.decorators.needs_permission",
+            "powernap.decorators.login",
+            "powernap.decorators.public",
+        ],
+        response_blueprint="powernap.architect.blueprints.ResponseBlueprint",
+        request_class="powernap.architect.requests.ApiRequest",
+        api_encoder="powernap.architect.responses.APIEncoder",
+        before_request_funcs=["powernap.auth.rate_limit.check_rate_limit"],
+        after_request_funcs=[]):
         """
         :param version: (int): version number for endpoints registerd with this
             architect.
+        :param name: (string): a name for this architect
         :param prefix: (string): a url prefix to append to all endpoints.
             Requires '{}' to format in the version number. If not provided
             `current_app.config["API_URL_PREFIX"] will be used.
@@ -53,62 +64,61 @@ class Architect:
         :param base_dir: (string): the full path of the base directory of the
             Flask application.
         :param template_dir: (string) the full path of the template directory
-        :param name: (string) a name for this architect
-        :param response_blueprint: (class): class used for flask blueprints.
-            Must inherit from `ResponseBlueprint`.
         :param crudify_funcs: (dict): keys are crudify request types keys
             are functions that are used for crudifying.
-        :param login_manager: (class): Instance of `flask_login.LoginManager`
-            used to set current_user value.
-        :param user_class: (class): Class that `user_from_redis_token` should
-            return an instance of for the `current_user`.
-        :param user_loader: (func): function for
-            `login_manager.requreset_loader`
-        :param api_encoder: (class): Json encoder to be used by the application.
-        :param before_request_funcs: (list): List of functions to run
+        :param user_class: (string): Path to class that `user_from_redis_token`
+            should return an instance of for the `current_user`.
+        :param user_loader: (string): Path to function for
+            `login_manager.set_loader`.
+        :param login_manager: (string): Path to class used to used to set
+            current_user value.
+        :param response_blueprint: (string): import string for class used for
+            flask blueprints.  Must inherit from `ResponseBlueprint`.
+        :param request_class: (strign): Import string for class used for
+            requests.
+        :param api_encoder: (string): Path to Json encoder to be used by the
+            application.
+        :param before_request_funcs: (list): List of function paths to run
             before requests.
-        :param after_request_funcs: (list): List of functions to run
+        :param after_request_funcs: (list): List of function paths to run
             after requests.
         """
         self.blueprints = []
         self.version = version
+        self.name = name
         self._prefix = prefix
-        self.decorators = self._load_decorators(decorators)
         self.base_dir = base_dir
         self.template_dir = template_dir
-        self.name = name
-        self.response_blueprint = response_blueprint or ResponseBlueprint
         self.crudify_funcs = {
             k: crudify_funcs.get(k)
             for k in ("GET", "GET ONE", "PUT", "POST", "DELETE")
         }
         self._init_login_manager(login_manager, user_loader, user_class)
-        self.api_encoder = api_encoder or APIEncoder
-        self.before_request_funcs = before_request_funcs or [check_rate_limit]
-        self.after_request_funcs = after_request_funcs or []
+        self.decorators = [load_from_string(path) for path in decorators]
+        self.response_blueprint = load_from_string(response_blueprint)
+        self.request_class = load_from_string(request_class)
+        self.api_encoder = load_from_string(api_encoder)
+        self.before_request_funcs = [load_from_string(path)
+                                    for path in before_request_funcs]
+        self.after_request_funcs = [load_from_string(path)
+                                    for path in after_request_funcs]
 
     def _init_login_manager(self, login_manager, user_loader, user_class):
         if not user_loader and not user_class:
             raise Exception(
                 'Define either the "user_loader" or "user_class" kwarg.')
+        user_class = load_from_string(user_class) if user_class else None
+        user_loader = load_from_string(user_loader) if user_loader else None
         user_loader = user_loader or user_from_redis_token_wrapper(user_class)
-        self.login_manager = login_manager or LoginManager()
+        self.login_manager = load_from_string(login_manager)()
         self.login_manager.request_loader(request_user_wrapper(user_loader))
-
-    def _load_decorators(self, decorator_paths):
-        decorators = []
-        for path in decorator_paths:
-            module, decorator_name = path.rsplit(".", 1)
-            decorator = getattr(importlib.import_module(module), decorator_name)
-            decorators.append(decorator)
-        return decorators
 
     def init_app(self, app):
         with app.app_context():
             app.json_encoder = self.api_encoder
             self.login_manager.init_app(app)
             app.register_blueprint(self)
-            app.request_class = ApiRequest
+            app.request_class = self.request_class
             app.register_error_handler(ApiError, api_error)
             app.register_error_handler(404, api_error)
             init_cors(app)
