@@ -21,13 +21,12 @@ def require_login(func, login=True):
     return _formatter
 
 
-def require_permissions(func, permissions=None):
+def require_permission(func, needs_permission=False):
     def _formatter(*args, **kwargs):
-        if permissions and not getattr(current_user, 'is_admin', False):
-            # TODO: implement the actual permissions functionality.
-            pass
-            #if not current_user.has_permission("generic name", permissions):
-            #    raise PermissionError(description={'permissions': permissions})
+        if needs_permission and not getattr(current_user, 'is_admin', False):
+            if not current_user.has_permission():
+                raise PermissionError(
+                    description="You have not been granted permission.")
         return func(*args, **kwargs)
     return _formatter
 

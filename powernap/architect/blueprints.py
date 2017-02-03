@@ -9,7 +9,7 @@ from powernap.architect.requests import ApiRequest
 from powernap.architect.responses import format_api_response, APIEncoder
 from powernap.auth.decorators import (
     require_login,
-    require_permissions,
+    require_permission,
     require_public,
     safe_response,
 )
@@ -152,7 +152,7 @@ class Architect:
         return [
             ("format_", format_api_response, True),
             ("safe", safe_response, False),
-            ("permissions", require_permissions, {}),
+            ("needs_permission", require_permission, False),
             ("login", require_login, True),
             ("public", require_public, False),
         ]
@@ -179,9 +179,6 @@ class ResponseBlueprint(Blueprint):
         """Wrap view with api response decorators, make `self.link`."""
         link = {'url': self.url_prefix + rule}
         link.update(options)
-        if link.get('permissions'):
-            link[self.name] = link['permissions']
-            del link['permissions']
         self.links.append(link)
 
         route_options = self.route_options(options)
@@ -205,7 +202,7 @@ class ResponseBlueprint(Blueprint):
         return {"strict_slashes": False}
 
     def crudify(self, url, model, create_form=None, update_form=None, ignore=[],
-                permissions={}, **kwargs):
+                needs_permission={}, **kwargs):
         """Generates Create, Read, Update, and Delete endpoints.
 
         :param url: The base url string for each endpoint.
@@ -266,19 +263,19 @@ class ResponseBlueprint(Blueprint):
         for method, func in funcs:
             if method not in ignore:
                 self.route_crudify_method(
-                    url, model, method, func, permissions, **kwargs)
+                    url, model, method, func, needs_permission, **kwargs)
 
-    def route_crudify_method(self, url, model, method, func, all_permissions,
+    def route_crudify_method(self, url, model, method, func, needs_permission,
                              **kwargs):
         method_url = url
         func.__name__ = "{}_{}".format(method, model.__name__)
-        permissions = all_permissions.get(method)
+        needs_permission = needs_permission.get(method)
         if inspect.getargspec(func).args:
             method_url += "/<int:id>"
         methods = [method.split(' ')[0]]
         self.route(
             method_url,
             methods=methods,
-            permissions=permissions,
+            needs_permission=needs_permission,
             **kwargs
         )(func)
