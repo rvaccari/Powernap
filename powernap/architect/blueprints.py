@@ -228,7 +228,7 @@ class ResponseBlueprint(Blueprint):
         :param create_form: Form to use for creation.
         :param update_form: Form to use for update.
         :param ignore: Do not create endpoints for this list of methods.
-        :param permissions: Dictionary of permissions for each method. Ex:
+        :param needs_permissions: Dictionary of permissions for each method. Ex:
             permissions = {
                 "GET":     False,
                 "GET ONE": False,

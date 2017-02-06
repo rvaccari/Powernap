@@ -5,7 +5,7 @@ from flask_login import current_user
 from sqlalchemy import exc
 
 from powernap.exceptions import InvalidFormError
-from powernap.helpers import load_from_string
+from powernap.helpers import load_from_string, model_attrs
 from powernap.query.columns import BaseQueryColumn, QUERY_COLUMNS
 
 
@@ -23,12 +23,13 @@ def construct_query(cls, enforce_owner=True, **kwargs):
     return QueryTransformer(cls).transform(query_args)
 
 
-def extend_query(query, enforce_owner=True, **kwargs):
+def extend_query(query, enforce_owner=True, ignore=[], **kwargs):
     """Return :class:`flask_sqlalchemy.Pagination` object from kwargs.
 
     :param query: A query on an object.
     :param enforce_owner: Ensures `id` in the query is set to
         the `current_user`'s id.
+    :param ignore: Parameters to ignore from the query_args.
     :param kwargs: Kwargs to overide the query_args passed to
         :meth:`.QueryTransformer.transform`.
 
@@ -39,6 +40,8 @@ def extend_query(query, enforce_owner=True, **kwargs):
     cls = query._primary_entity.type
     query_args = get_query_args_for_cls(
         cls, enforce_owner=enforce_owner, **kwargs)
+    for arg in ignore:
+        query_args.pop(arg)
     return QueryTransformer(cls, query=query).transform(query_args)
 
 
@@ -60,10 +63,10 @@ def get_query_args_for_cls(cls, enforce_owner=True, **kwargs):
 
 def override_owner_id(cls, query_args):
     """Used to ensure that users cannot query other users data."""
-    attr = current_app.config.get("ACTIVE_TOKENS_ATTR", "id")
-    if not getattr(current_user, 'is_admin', False) and hasattr(cls, attr) and \
-            hasattr(current_user, attr):
-        query_args[attr] = getattr(current_user, attr)
+    user_attr, db_attr = model_attrs()
+    if not getattr(current_user, 'is_admin', False) and hasattr(cls, db_attr) \
+            and hasattr(current_user, user_attr):
+        query_args[db_attr] = getattr(current_user, user_attr)
     return query_args
 
 

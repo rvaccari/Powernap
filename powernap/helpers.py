@@ -37,3 +37,9 @@ def redis_connection(db=None):
 def load_from_string(path):
     module, decorator_name = path.rsplit(".", 1)
     return getattr(importlib.import_module(module), decorator_name)
+
+
+def model_attrs():
+    client_key = current_app.config.get("ACTIVE_TOKENS_ATTR", "id")
+    db_entry_key = current_app.config.get("DB_ENTRY_ATTR", "id")
+    return client_key, db_entry_key

@@ -120,9 +120,9 @@ def like(cls, query, column, value):
 
 def max(cls, query, column, value):
     """Return sql `MAX` query."""
-    return query(func.max(column))
+    return query.filter(func.max(getattr(cls, column)))
 
 
 def min(cls, query, column, value):
     """Return sql `MIN` query."""
-    return query(func.min(column))
+    return query.filter(func.min(getattr(cls, column)))

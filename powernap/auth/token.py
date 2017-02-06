@@ -3,7 +3,7 @@ import os
 
 from flask import current_app
 from flask_login import current_user
-from powernap.helpers import redis_connection
+from powernap.helpers import redis_connection, model_attrs
 
 
 class TempToken(object):
@@ -46,7 +46,8 @@ class TempToken(object):
 def active_tokens_key(user):
     prefix_key = current_app.config.get("ACTIVE_TOKENS_PREFIX")
     prefix = getattr(user, prefix_key) if prefix_key else "active"
-    attr_val = getattr(user, current_app.config["ACTIVE_TOKENS_ATTR"])
+    attr, _ = model_attrs()
+    attr_val = getattr(user, attr)
     return '{}:{}'.format(prefix, attr_val)
 
 

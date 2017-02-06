@@ -55,6 +55,9 @@ def my_stuff():
     return "stuff", success_code
 ```
 
+**NOTE**: these blueprints must be initialized in files names `views.py` otherwise the loader won't find them.
+
+
 ## Decorators
 
 Powernap's architect initialized with 5 default decorators that wrap all functions that are routed to flask.
@@ -151,9 +154,6 @@ Kwarg defaults to `False`.
 Usage: `@bp.route('/item', methods=["GET"], public=True)`
 
 
-## Crudify
-
-
 # Models 
 
 In many API's some or all of an entry in a databse is returned to the user.  Powernap implements multiple helper utilities to make this process easier.
@@ -218,18 +218,181 @@ instance.confirm_owner()
 
 # Api Response
 
-One of the major 
-
 ## api_response
 
-## Rare limiting
+One of the major benifits of using powernap is that the Api Response object lets you easily define data top be sent ot the client from a model.
+With powernapp an endpoint that receives the `format_` decorator can return any instance of a model.  The ApiResponse object will look for an `api_response` method on the model and automatically run it and JSON serialize the data to return to the user.
+
+Usage:
+
+```python
+class MyModel(PowernapMixin, db.Model):
+    id = Column(Integer, primary_key=True) 
+    name = Column(String(255)) 
+    age = Column(Integer) 
+    social_security = Column(Integer) 
+
+    def api_response(self):
+        return {
+            "name": self.name
+            "age": self.age,
+        }
+```
+
+```python
+from powernap.http import success_code
+
+bp = architect.sub_blueprint('my_model', url_prefix='/my-model')
+
+@bp.route('/<int:id>', methods=['GET'], public=True)
+def my_model(id):
+    instance = MyModel.get_or_404(id)
+    instance.confirm_owner()
+    return instance, success_code
+
+```
+
+Returns `200` response with `{"name": "john doe", "age": 28}` as the json body (not containing `social_security` value).
+
+**This also works with a list of instances.**
+
+```python
+@bp.route('/models', methods=['GET'], public=True)
+def model(id):
+    instances = MyModel.query.all()
+    return instances, success_code
+```
+
+Returns `200` response with `[{"name": "David Bledsoe", "age": 19}, {"name": "Larry Farnell", "age": 72}, {"name": "john doe", "age": 28}]` as the json body.
+
+**Or regular python data structures.**
+
+```python
+@bp.route('/stuff', methods=['GET'], public=True)
+def model(id):
+    instances = MyModel.query.all()
+    return {"one": [1,2,3], "two": "hello world"}, success_code
+```
+
+Returns `200` response with `{"one": [1,2,3], "two": "hello world"}` as the json body.
 
 
-## Permissions
+## Rate limiting
+
+By default all requests will be checked against a rate limit and all responses returned by Sub Blueprint routes will have rate limiting values in their header.
+The rate limiting information is stored in redis.
+
+### Settings
+
+- `REQUESTS_PER_HOUR`: How many non authenticated requests per hour, per user are allowed.
+- `AUTHENTICATED_REQUESTS_PER_HOUR`: How many authenticated requests per hour, per user are allowed.
+- `RATE_LIMIT_EXPIRATION`: Number of seconds until the rate limit expires. (This is the value passed as the TTL for the redis key).
+
+### Headers
+
+- 'X-RateLimit-Limit': The upper limit for the current user.
+- 'X-RateLimit-Remaining': How many requests the current user has remaining in this time block.
+- 'X-RateLimit-Reset': How many seconds until the rate limit resets.
+
+**TODO: Allow Rate-limiting an IP per hour.
+
+# Forms
+
+When submitting a form to create or update a database entry you do not want users to update their models to be owned by other users and vice versa.  The `PowernapFormMixin` takes care of this.
+*Note: This mixin has only been tested with WTForms.*
+
+Your views can return `form.format_errors()` to ensure that errors are returned from the API in the same format everytime.
+
+## PowernapFormMixin
+
+```python
+from powernap.mixins import PowernapFormMixin
+from wtforms import Form, IntegerField, StringField, validators
+
+from my.module import MyModel
+
+
+class MyModelForm(PowernapFormMixin, Form):
+    model = MyModel
+
+    id = IntegerField(validators=[validators.DataRequired()]
+    name = StringField(validators=[validators.DataRequired()]
+```
+
+
+# Crudify
+
+Typically, basic CRUD funcitonality for models is repetitive.  THe crudify function aims to speed up the process of writing those endpoints by providing pre-written views that implement CRUD functionality.
+For crudify to work your form must inherit from `Powernap.mixins.PowernapFormMixin`.
+
+```python
+bp = architect.sub_blueprint('model', url_prefix='/model', public=True)
+
+# Will create GET, GET ONE, PUT, POST, and DELETE endpoints for the MyModel
+# class and use the MyModelForm for the PUT and POST requests.
+bp.crudify('/', MyModel, MyModelForm)
+```
+
+Crudify accepts the following additional kwargs:
+
+- `update_form`: Form to use for PUT method.  Will use the create_form if not provided..
+- `ignore`: Do not create endpoints for this list of methods. Ex. `["PUT", "POST"]`.
+- `needs_permission`: Dictionary settings needs_permission for each method. Ex:
+```python
+    {
+        "GET":     False,
+        "GET ONE": False,
+        "POST":    True,
+        "PUT":     True,
+        "DELETE":  True,
+    }
+```
+- `kwargs`: Any additional kwargs you want passed to the `route` function.
+
+You can pass your own crudify funcs as a dictionary to the architect object where the key is the method (`GET`) and the value is the function.
+
+These are the methods used by crudify by defualt:
+
+```python
+def get_func():
+    return construct_query(model), success_code
+
+def get_one_func(id):
+    instance = model.query.get_or_404(id)
+    instance.confirm_owner()
+    return instance, success_code
+
+def post_func():
+    form = create_form(request.form)
+    if form.validate():
+        instance = form.create_obj()
+        return instance, post_success_code
+    return form.format_errors(), error_code
+
+def put_func(id):
+    instance = model.query.get_or_404(id)
+    instance.confirm_owner()
+    form = update_form(request.form, instance=instance)
+    if form.validate():
+        instance = form.update_obj(instance)
+        return instance, success_code
+    return form.format_errors(), error_code
+
+def delete_func(id):
+    instance = model.query.get_or_404(id)
+    instance.confirm_owner()
+    instance.delete()
+    return empty_success_code
+```
+
+**TODO: Allow passing of all decorators to the crudify methods in the same manner as needs_permission**
+
+
+# Permissions
 
 By default all Archietct Sub Blueprint routes are wrapped with a permissions decorator.  In order to make use of the functionality the following mixins need to be used.
 
-### PermissionTableMixin
+## PermissionTableMixin
 
 This mixin creates a table via sqlalchemy that holds permission information.  This mixin will create the following fields
 
@@ -249,7 +412,7 @@ class Permission(PermissionTableMixin, db.Model):
     pass
 ```
 
-### PermissionUserMixin
+## PermissionUserMixin
 
 Your `current_user` model's must inherit from this mixin and a `permission_class` arg for the `needs_permission` decorator to work.
 
@@ -316,3 +479,122 @@ def auth():
 ```
 
 # Easy Query
+
+Implementing a way to query models via an API can be time consuming. Powernap comes with builtin methods to read query args out of the url to perform data queries.
+
+## Query Params
+
+The 4 different types of special arguments:
+
+1. Keys that are unique fields on the model. e.g. `/api/v1/my-model?name=john`
+2. A $ followed by keys that are methods on a SQLAlchemy session such as order_by. e.g. $order_by=client_id.
+3. A $ followed by one or more of the unique query methods below. e.g. $subject__icontains=hello.
+4. A $ followed by one or more of the pagination query args page and per_page.
+
+### Unique Query Methods
+
+- **FIELD__not_eq**: Will return any object who’s FIELD is not equal to the value `cls.query.filter(func.(getattr(cls, FIELD) != value))`
+- **FIELD__icontains**: Searches a field to see if it contains the value. `cls.query.filter(func.LOWER(getattr(cls, FIELD)).contains(value.lower())`.
+- **FIELD__inside**: Will return any object who’s FIELD is inside the value list. `cls.query.filter(cls.FIELD.in_(value))`.
+- **FIELD__not_inside**: Will return any object who’s FIELD is not inside the value list. `cls.query.filter(~cls.FIELD.in_(value))`.
+- **FIELD__gt**: Will return any object who’s FIELD is greater than the value. `cls.query.filter(cls.FIELD > value)`.
+- **FIELD__gte**: Will return any object who’s FIELD is greater than or equal to the value. `cls.query.filter(cls.FIELD >= value)`.
+- **FIELD__lt**: Will return any object who’s FIELD is less than the value. `cls.query.filter(cls.FIELD < value)`.
+- **FIELD__lte**: Will return any object who’s FIELD is less than or equal to the value. `cls.query.filter(cls.FIELD <= value)`.
+- **FIELD__like**: Will return any object’s FIELD who’s value matches a sql like query. `cls.query.filter(cls.FIELD).like(value)`.
+- **FIELD__max**: Will return the max value in  FIELD. `cls.query.filter(func.max(cls.FIELD))`.
+- **FIELD__min**: Will return the min value in  FIELD. `cls.query.filter(func.min(cls.FIELD))`.
+
+Example: `/api/v1/my-model?$name__like=jo%`
+
+## construct_query
+
+`from powernap.query.transformer import construct_query`
+
+Pass a model to this function and it will return a sqlalchemy query of that model based on the query_args in the param.
+
+`construct_query(MyModel)` with query_args `name="john"` will run `MyModel.query.filter_by(name="john").all().  If only one object is in the list it will return only that one object.
+If multiple objects are in the list, it will return a pagination object
+
+By default `enforce_owner` kwarg is true and will use the `ACTIVE_TOKENS_ATTR` and `DB_ENTRY_ATTR` to override the query args to ensure that the current user can only query for models belonging to them (if the model does not have the `DB_ENTRY_ATTR` field then this functinality is ignored).
+
+
+## exposed_fields
+
+Sometimes you do not want the user to be able to query by every field in the database. By default the user cannot query by any fields until they are exposed.  To expose a field add an `exposed_fields` attr tot he model.
+
+```python
+class MyModel(PowernapMixin, db.Model):
+
+    exposed_fields = [
+        "id",
+        "name",
+    ]
+
+    id = Column(IntegerField())
+    name = Column(StringField(255))
+    social = Column(StringField(255))
+```
+The user will only be able to query by `id` and `name` with `construct_query` via query args.
+
+
+## extend_query
+
+`from powernap.query.transformer import extend_query`
+
+This method is for using `construct_query` like functionality but with an already started query.
+
+```python
+query = MyModel.query.filter_by(name="john")
+extend_query(query, ignore=["name"])
+```
+
+This will query name = john regarless of if the user passed a name value in the query args.
+
+## Pagination
+
+By default construct_query will paginate the results.  The pagination data is passed to the client via the Link header:
+
+```
+Link:
+<https://api.hivelocity.net/api/v1/URL_AND_ARGS&page=FIRST_PAGE>; rel="first",
+<https://api.hivelocity.net/api/v1/URL_AND_ARGS&page=PREV_PAGE>; rel="prev",
+<https://api.hivelocity.net/api/v1/URL_AND_ARGS&page=NEXT_PAGE>; rel="next",
+<https://api.hivelocity.net/api/v1/URL_AND_ARGS&page=LAST_PAGE>; rel="last"
+```
+**IMPORTANT**: This Link header does not follow all specifications in [RFC 5988](https://tools.ietf.org/html/rfc5988), and the links above are returned in no specific order.
+
+### Settings
+
+- `PAGINATION_PAGE`: default pagination page
+- `PAGINATION_PER_PAGE`: default # of instances per page.
+
+## Custom Columns
+
+
+By default Integer, Boolean, String, and DateTime columns are supported.  Other sqlalchemy column types need custom columns in order to work with Easy Query methods.
+Columns handle implementing the various query arg methods depending upon the field type of a particular query arg.
+
+To add custom query column create a new column form the `BaseQueryColumn` and add it to `QueryColumns`
+
+```python
+from powernap.query.columns import QUERY_COLUMNS, BaseQueryColumn
+from sqlalchemy.sql.sqltyupes import String, Text
+
+# Maybe you do not want your users to do like queries on string or text
+# columns and want all the values to be converted to pig latin.
+
+class CustomStringColumn(BaseQueryColumn):
+    invalid = ["like"]
+
+    def handle(self, column, value, func):
+        value = "{}{}say".format(value[1:], value[0])
+        return super().handle(column, value, func)
+
+
+QUERY_COLUMNS[String] = CustomStringColumn
+QUERY_COLUMNS[Text] = CustomStringColumn
+```
+
+### Settings
+- `QUERY_METHOD_DECORATOR`: Function that decorates the methods that return special kwargs. *Advanced users only*
