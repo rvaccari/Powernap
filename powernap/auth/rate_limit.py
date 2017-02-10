@@ -56,13 +56,13 @@ class RateLimiter:
 
     @property
     def token(self):
-        if self.user.is_authenticated():
+        if self.user.is_authenticated:
             return self.user.redis_token
         return self.ip
 
     @property
     def limit(self):
         val = 'REQUESTS_PER_HOUR'
-        if self.user.is_authenticated():
+        if self.user.is_authenticated:
             val = 'AUTHENTICATED_REQUESTS_PER_HOUR'
         return current_app.config[val]

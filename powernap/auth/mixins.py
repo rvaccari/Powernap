@@ -33,6 +33,8 @@ class PermissionUserMixin(object):
 
 
 class PermissionTableMixin(object):
+    __tablename__ = "powernap_mixins"
+
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer(), nullable=False, index=True)
     rule = Column(String(255), nullable=False)

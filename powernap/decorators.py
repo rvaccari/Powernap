@@ -17,7 +17,7 @@ def public(func, public=False):
 def login(func, login=True):
     """Identifies public endpoints that do not require authenticated users."""
     def _formatter(*args, **kwargs):
-        if login and not current_user.is_authenticated():
+        if login and not current_user.is_authenticated:
             raise UnauthorizedError
         return func(*args, **kwargs)
     return _formatter
