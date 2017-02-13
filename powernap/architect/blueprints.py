@@ -44,7 +44,7 @@ class Architect:
             "powernap.decorators.format_",
             "powernap.decorators.safe",
             "core.otp.decorators.otp",
-            "powernap.decorators.needs_permission",
+            "powernap.decorators.permission",
             "powernap.decorators.login",
             "powernap.decorators.public",
         ],
@@ -52,7 +52,7 @@ class Architect:
         request_class="powernap.architect.requests.ApiRequest",
         api_encoder="powernap.architect.responses.APIEncoder",
         before_request_funcs=["powernap.auth.rate_limit.check_rate_limit"],
-        after_request_funcs=[]):
+        after_request_funcs=[], permissions=None):
         """
         :param version: (int): version number for endpoints registerd with this
             architect.
@@ -83,6 +83,11 @@ class Architect:
             before requests.
         :param after_request_funcs: (list): List of function paths to run
             after requests.
+        :param permissions: (dict): Dictionary where keys are permission strings
+            and values are human readable equivalents. Permissions strings
+            are . seperated values.  e.g. "device" or "device.edit".  Perms are
+            recursive. Any user with the "device.edit" permission would also
+            have the "device" permission.
         """
         self.blueprints = []
         self.version = version
@@ -103,6 +108,7 @@ class Architect:
                                     for path in before_request_funcs]
         self.after_request_funcs = [load_from_string(path)
                                     for path in after_request_funcs]
+        self.permissions = permissions or []
 
     def _init_login_manager(self, login_manager, user_loader, user_class):
         """Loads the flask_login manager with the user retrieval function."""
@@ -153,7 +159,8 @@ class Architect:
                 kwargs[k] = v
 
         blueprint = self.response_blueprint(
-            name, self.decorators, default_options=default_options, **kwargs)
+            name, self.decorators, default_options=default_options,
+            permissions=self.permissions, **kwargs)
         for func in self.before_request_funcs:
             blueprint.before_request(func)
         for func in self.after_request_funcs:
@@ -174,7 +181,7 @@ class ResponseBlueprint(Blueprint):
     cors_rules = []
 
     def __init__(self, name, decorators, import_name='', crudify_funcs=None,
-                 default_options=None, **kwargs):
+                 default_options=None, permissions=None, **kwargs):
         """
         :param name: (string): Name of blueprint.
         :param decorators: (list): List of functions that will decorate routes.
@@ -183,11 +190,14 @@ class ResponseBlueprint(Blueprint):
             function.
         :param default_options: (dict): Dictionary with default values for
             decorators on this blueprints routes.
+        :param permissions: (dict): Dictionary where keys are permissions and
+            values are human readable strings.
         """
         super(ResponseBlueprint, self).__init__(name, import_name, **kwargs)
         self.decorators = decorators
         self.crudify_funcs = crudify_funcs or {}
         self.default_options = default_options or {}
+        self.permissions = permissions
 
     def route(self, rule, **options):
         """Wrap view with api response decorators, make `self.link`."""
@@ -196,6 +206,11 @@ class ResponseBlueprint(Blueprint):
         self.links.append(link)
 
         options = self.options(options)
+        permission = options.get("permission")
+        if permission and permission not in self.permissions:
+            raise Exception("'{}' is not a valid permission: {}".format(
+                permission, sorted(self.permissions.keys())
+            ))
 
         def decorator(f):
             endpoint = options.pop("endpoint", f.__name__)
@@ -220,7 +235,7 @@ class ResponseBlueprint(Blueprint):
         return {"strict_slashes": False}
 
     def crudify(self, url, model, create_form=None, update_form=None, ignore=[],
-                needs_permission={}, **kwargs):
+                permission={}, **kwargs):
         """Generates Create, Read, Update, and Delete endpoints.
 
         :param url: The base url string for each endpoint.
@@ -228,13 +243,13 @@ class ResponseBlueprint(Blueprint):
         :param create_form: Form to use for creation.
         :param update_form: Form to use for update.
         :param ignore: Do not create endpoints for this list of methods.
-        :param needs_permissions: Dictionary of permissions for each method. Ex:
+        :param permission: Dictionary of permissions for each method. Ex:
             permissions = {
-                "GET":     False,
-                "GET ONE": False,
-                "POST":    True,
-                "PUT":     True,
-                "DELETE":  True,
+                "GET":     "perm",
+                "GET ONE": "perm",
+                "POST":    "perm",
+                "PUT":     "perm",
+                "DELETE":  "perm",
             }
         """
         if not update_form:
@@ -281,20 +296,16 @@ class ResponseBlueprint(Blueprint):
         for method, func in funcs:
             if method not in ignore:
                 self.route_crudify_method(
-                    url, model, method, func, needs_permission, **kwargs)
+                    url, model, method, func, permission.get(method), **kwargs)
 
-    def route_crudify_method(self, url, model, method, func, needs_permission,
-                             **kwargs):
+    def route_crudify_method(self, url, model, method, func, permission, **kwargs):
         """Adds the crudify methods as actual routes to the blueprint."""
         method_url = url
         func.__name__ = "{}_{}".format(method, model.__name__)
-        needs_permission = needs_permission.get(method)
         if inspect.getargspec(func).args:
             method_url += "/<int:id>"
         methods = [method.split(' ')[0]]
-        self.route(
-            method_url,
-            methods=methods,
-            needs_permission=needs_permission,
-            **kwargs
-        )(func)
+        kwargs["methods"] = methods
+        if permission:
+            kwargs["permission"] = permission
+        self.route(method_url, **kwargs)(func)

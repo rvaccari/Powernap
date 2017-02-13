@@ -4,7 +4,7 @@ from setuptools import setup
 if __name__ == '__main__':
     setup(
         name='powernap',
-        version='0.0.8',
+        version='1.0.0',
         author='Zachary Kazanski',
         author_email='kazanski.zachary@gmail.com',
         description='Framework for quickly buidling REST-ful APIs in Flask.',
