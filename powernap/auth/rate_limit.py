@@ -57,7 +57,7 @@ class RateLimiter:
     @property
     def token(self):
         if self.user.is_authenticated:
-            return self.user.redis_token
+            return self.redis_token()
         return self.ip
 
     @property
@@ -66,3 +66,6 @@ class RateLimiter:
         if self.user.is_authenticated:
             val = 'AUTHENTICATED_REQUESTS_PER_HOUR'
         return current_app.config[val]
+
+    def redis_token(self):
+        return "{}:{}".format(str(self.user.__class__), self.user.id)

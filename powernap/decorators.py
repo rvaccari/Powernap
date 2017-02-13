@@ -23,11 +23,11 @@ def login(func, login=True):
     return _formatter
 
 
-def needs_permission(func, needs_permission=False):
+def permission(func, permission=None):
     """Identifies endpoints that require the user to have permisssion."""
     def _formatter(*args, **kwargs):
-        if needs_permission and not getattr(current_user, 'is_admin', False):
-            if not current_user.has_permission():
+        if permission and not getattr(current_user, 'is_admin', False):
+            if not current_user.has_permission(permission):
                 raise PermissionError(
                     description="You have not been granted permission.")
         return func(*args, **kwargs)

@@ -103,7 +103,7 @@ Architect(
         "powernap.decorators.format_",
         "powernap.decorators.safe",
         "my.module.decorators.otp",
-        "powernap.decorators.needs_permission",
+        "powernap.decorators.permission",
         "powernap.decorators.login",
     ]
 )
@@ -127,13 +127,13 @@ Kwarg defaults to `False`.
 Usage: `@bp.route('/item', methods=["GET"], safe=True)`
 
 
-### needs_permission
+### permission
 
 This function signals that a user needs explicit permission to access this endpoint. See permissions below. 
 
-Kwarg defaults to `False`.
+Kwarg defaults to `None`.
 
-Usage: `@bp.route('/item', methods=["GET"], needs_permission=True)`
+Usage: `@bp.route('/item', methods=["GET"], permission="device.edit")`
 
 
 ### login
@@ -391,6 +391,17 @@ def delete_func(id):
 # Permissions
 
 By default all Archietct Sub Blueprint routes are wrapped with a permissions decorator.  In order to make use of the functionality the following mixins need to be used.
+
+The architect will need to be initialized with a kwarg named `permissions` what is a dictionary where keys are permission strings
+and values are their human readable counterparts.
+
+Permissions strings should be `.` seperated values where values are one word using only chars.  e.g. `device` or `device.edit`.
+Perms are recursive so any user with the "device.edit" permission would also have the "device" permission.
+
+Checks are done via a `like` query to the database.  So a route requiring `device`  will make the query 
+`SELECT * FROM powernap_permissions WHERE permission LIKE 'device%';`.  So that would match `device.edit`.
+This allows heirchies.  Be careful though:  a `device-stuff` permission would match like query of `device%` also.
+
 
 ## PermissionTableMixin
 
