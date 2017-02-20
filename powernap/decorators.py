@@ -1,3 +1,5 @@
+import json
+
 import bleach
 from flask import abort, current_app
 from flask_login import current_user
@@ -39,7 +41,27 @@ def safe(func, safe=False):
     def _formatter(*args, **kwargs):
         res = func(*args, **kwargs)
         if not safe:
-            clean = lambda res: res.set_data(bleach.clean(res.get_data()))
+            def sanitize(data):
+                """This function recursively bleaches all the data.
+
+                This is not optimum, as we have to decode then recode.  This
+                really should be done in the ApiResponse.  Need to rethink how
+                decorators are registered for a route so that bleaching can be
+                done before the response results are rendered.
+                """
+                if isinstance(data, dict):
+                    data = {sanitize(k): sanitize(v) for k, v in data.items()}
+                elif isinstance(data, (list, tuple)):
+                    data = [sanitize(i) for i in data]
+                else:
+                    data = bleach.clean(data)
+                return data
+
+            def clean(res):
+                data = json.loads(res.get_data().decode())
+                data = json.dumps(sanitize(data))
+                res.set_data(data)
+
             if isinstance(res, (tuple)):
                 clean(res[0])
             else:
