@@ -176,7 +176,7 @@ class Architect:
 
 
 class ResponseBlueprint(Blueprint):
-    """Like a blueprint but checks permissions & returns api responses."""
+    """Like a blueprint but decorates the routes and has crudify funcs."""
     links = []
     cors_rules = []
 
