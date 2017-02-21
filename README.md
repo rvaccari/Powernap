@@ -282,6 +282,8 @@ Returns `200` response with `{"one": [1,2,3], "two": "hello world"}` as the json
 By default all requests will be checked against a rate limit and all responses returned by Sub Blueprint routes will have rate limiting values in their header.
 The rate limiting information is stored in redis.
 
+Rate limiting can be disbabled in the app settings like this: `RATE_LIMITING = False`.
+
 ### Settings
 
 - `REQUESTS_PER_HOUR`: How many non authenticated requests per hour, per user are allowed.
