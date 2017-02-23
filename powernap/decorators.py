@@ -53,7 +53,7 @@ def safe(func, safe=False):
                     data = {sanitize(k): sanitize(v) for k, v in data.items()}
                 elif isinstance(data, (list, tuple)):
                     data = [sanitize(i) for i in data]
-                else:
+                elif isinstance(data, str):
                     data = bleach.clean(data)
                 return data
 

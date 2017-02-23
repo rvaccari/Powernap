@@ -52,6 +52,9 @@ class RateLimiter:
             requests = self.redis.setex(
                 key, 1, current_app.config['RATE_LIMIT_EXPIRATION']
             )
+
+        if not current_app.config.get("RATE_LIMITING", True):
+            return False
         return requests > limit
 
     @property
@@ -68,4 +71,8 @@ class RateLimiter:
         return current_app.config[val]
 
     def redis_token(self):
-        return "{}:{}".format(str(self.user.__class__), self.user.id)
+        return "{}:{}:{}".format(
+            str(self.user.__class__),
+            self.user.id,
+            request.remote_addr,
+        )
