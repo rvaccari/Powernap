@@ -90,12 +90,13 @@ class ApiResponse(object):
     def get_pagination_params(self, results):
         """Return pagination params from results."""
         formatted_data = {
+            "current": results.page,
             'first': 1,
             'last': results.pages,
-            'total': results.total,
-            'prev': results.prev_num or 1,
             'next': results.next_num,
             'per_page': results.per_page,
+            'previous': results.prev_num,
+            'total': results.total,
         }
         if results.next_num > results.pages:
             formatted_data['next'] -= 1
@@ -128,25 +129,7 @@ class ApiResponse(object):
 
     def make_pagination_headers(self):
         """Make link-headers for pagination."""
-        pagination = self.pagination
-        if not pagination:
-            return {}
-        # We do not return total data now, but this is here for the future.
-        pagination.pop('total')
-        per_page = pagination.pop(self.per_page)
-
-        full_path = request.full_path
-        arg_format = '${}={}'
-        re_format = '\${}=\d*'
-        link_format='<{}>; rel="{}"'
-        links = []
-        for key, val in pagination.items():
-            for p, v in {self.page: val, self.per_page: per_page}.items():
-                data = arg_format.format(p, v)
-                path = re.sub(re_format.format(p), data, full_path)
-            path = current_app.config['BASE_URL'] + path
-            links.append(link_format.format(path, key))
-        return {'Link': ', '.join(links)}
+        return {'X-Pagination': self.pagination or {}}
 
     def log_bad_request_from_admin(self, data):
         """If not a 2XX response code, log bad requests made by an admin user.
