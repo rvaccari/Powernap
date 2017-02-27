@@ -95,7 +95,7 @@ class ApiResponse(object):
             'last': results.pages,
             'next': results.next_num,
             'per_page': results.per_page,
-            'prev': results.prev_num,
+            'previous': results.prev_num,
             'total': results.total,
         }
         if results.next_num > results.pages:
