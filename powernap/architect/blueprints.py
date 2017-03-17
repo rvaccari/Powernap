@@ -174,6 +174,11 @@ class Architect:
         for blueprint in self.blueprints:
             app.register_blueprint(blueprint, **options)
 
+    @property
+    def jinja_loader(self):
+        """Flask needs every blueprint to have a jinja_loader."""
+        return None
+
 
 class ResponseBlueprint(Blueprint):
     """Like a blueprint but decorates the routes and has crudify funcs."""
