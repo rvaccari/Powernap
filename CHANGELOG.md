@@ -1,3 +1,8 @@
+3-17-17 v1.0.4:
+
+Fix missing jinja_loader on Architect 
+
+
 2-27-17 v1.0.3:
 
 Fix `X-Pagination` header.  Use this format {'per_page': 10, 'next': 2, 'prev': 0, 'first': 1, 'last': 10, 'total': 93, 'current': 1}
