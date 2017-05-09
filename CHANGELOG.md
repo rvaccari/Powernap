@@ -1,3 +1,8 @@
+5-09-17 v1.0.5:
+
+Add accepted 202 code to `http_codes`.
+
+
 3-17-17 v1.0.4:
 
 Fix missing jinja_loader on Architect 
