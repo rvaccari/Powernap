@@ -1,5 +1,6 @@
 success_code =              200
 post_success_code =         201
+accepted_code =             202
 empty_success_code =        204
 error_code =                400
 unauthorized_code =         401
