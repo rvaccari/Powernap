@@ -18,6 +18,5 @@ def init_cors(app):
             resp.headers['Access-Control-Allow-Credentials'] = 'true'
             resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS, GET, PUT, DELETE'
             resp.headers['Access-Control-Allow-Headers'] = allow_headers
-            if app.debug:
-                resp.headers['Access-Control-Max-Age'] = '1'
+            resp.headers['Access-Control-Max-Age'] = '1'
         return resp
