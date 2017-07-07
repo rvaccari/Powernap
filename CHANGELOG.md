@@ -1,3 +1,8 @@
+6-07-17 v1.1.0:
+
+Give ability to whitelist ip networks for the rate limiter
+
+
 5-09-17 v1.0.5:
 
 Add accepted 202 code to `http_codes`.

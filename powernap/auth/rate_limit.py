@@ -1,3 +1,5 @@
+import ipaddress
+
 from flask import current_app, request
 from flask_login import current_user
 
@@ -43,7 +45,8 @@ class RateLimiter:
         }
 
     def is_rate_limited(self):
-        return self.over_limit(self.token, self.limit)
+        return not self.ip_is_whitelisted() and \
+                self.over_limit(self.token, self.limit)
 
     def over_limit(self, key, limit):
         if self.redis.exists(key):
@@ -56,6 +59,15 @@ class RateLimiter:
         if not current_app.config.get("RATE_LIMITING", True):
             return False
         return requests > limit
+
+    def ip_is_whitelisted(self):
+        whitelist = current_app.config.get('RATE_LIMIT_WHITELIST', [])
+        whitelist = [ipaddress.ip_network(ip) for ip in whitelist]
+        request_ip = ipaddress.IPv4Address(self.ip)
+        for network in whitelist:
+            if request_ip in network:
+                return True
+        return False
 
     @property
     def token(self):

@@ -289,6 +289,7 @@ Rate limiting can be disbabled in the app settings like this: `RATE_LIMITING = F
 - `REQUESTS_PER_HOUR`: How many non authenticated requests per hour, per user are allowed.
 - `AUTHENTICATED_REQUESTS_PER_HOUR`: How many authenticated requests per hour, per user are allowed.
 - `RATE_LIMIT_EXPIRATION`: Number of seconds until the rate limit expires. (This is the value passed as the TTL for the redis key).
+- `RATE_LIMIT_WHITELIST`: List of ipv4 addresses and networks that are whitelisted.
 
 ### Headers
 
