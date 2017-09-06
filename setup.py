@@ -4,7 +4,7 @@ from setuptools import setup
 if __name__ == '__main__':
     setup(
         name='powernap',
-        version='1.1.0',
+        version='1.2.0',
         author='Zachary Kazanski',
         author_email='kazanski.zachary@gmail.com',
         description='Framework for quickly buidling REST-ful APIs in Flask.',
@@ -24,6 +24,7 @@ if __name__ == '__main__':
             'Flask-Login==0.4.0',
             'SQLAlchemy==1.1.5',
             'flask==0.12.0',
+            'gevent==1.2.1',
         ],
         classifiers=[
             'Programming Language :: Python',

@@ -70,7 +70,7 @@ def safe(func, safe=False):
     return _formatter
 
 
-def format_(func, format_=True):
+def format_(func, format_=True, app=None):
     """Decorator to format return values into api responses.
 
     Functions with this decorator can do this:
@@ -100,5 +100,5 @@ def format_(func, format_=True):
         rl = RateLimiter(current_user)
         headers = rl.headers()
 
-        return ApiResponse(data, status_code, headers).response
+        return ApiResponse(data, status_code, headers, app=app).response
     return _formatter

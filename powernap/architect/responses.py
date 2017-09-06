@@ -3,9 +3,22 @@ import json
 import re
 from decimal import Decimal
 
+import gevent
 from flask import current_app, jsonify, Response, request
 from flask_login import current_user
 from flask_sqlalchemy import Pagination
+
+
+def render_list_item_with_app_context(args):
+    app, item = args
+    with app.app_context():
+        return render_list_item(item)
+
+
+def render_list_item(item):
+    if hasattr(item, 'api_response'):
+        return item.api_response() 
+    return item
 
 
 class APIEncoder(json.JSONEncoder):
@@ -31,12 +44,13 @@ class ApiResponse(object):
     results = None
     pagination = None
 
-    def __init__(self, data, status_code, headers=None, json_encoder=None):
+    def __init__(self, data, status_code, headers=None, json_encoder=None, app=None):
         """Make data json serializable, detect the status, and set success."""
         self.page = current_app.config['PAGINATION_PAGE']
         self.per_page = current_app.config['PAGINATION_PER_PAGE']
         self.status_code = status_code
         self.json_encoder = json_encoder or APIEncoder
+        self.app = app
         if self.status_code // 100 == 2:
             self.results = self.construct_results(data)
         else:
@@ -80,12 +94,13 @@ class ApiResponse(object):
 
         Read more at: http://flask.pocoo.org/docs/0.10/security/#json-security.
         """
-        formatted = []
-        for item in results:
-            if hasattr(item, 'api_response'):
-                item = item.api_response()
-            formatted.append(item)
-        return formatted
+        if self.app:
+            reqs = [gevent.spawn(render_list_item_with_app_context, (self.app, item))
+                    for item in results]
+            gevent.joinall(reqs)
+            return [req.value for req in reqs]
+        else:
+            return [render_list_item(item) for item in results]
 
     def get_pagination_params(self, results):
         """Return pagination params from results."""

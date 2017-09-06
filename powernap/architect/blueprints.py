@@ -1,3 +1,4 @@
+import importlib
 import inspect
 from copy import deepcopy
 
@@ -37,7 +38,7 @@ def api_error(e):
 class Architect:
     """Registers multiple ResponseBlueprints and initializes settings."""
     def __init__(
-        self, version=1, name="architect", prefix=None, base_dir="",
+        self, app_module=None, version=1, name="architect", prefix=None, base_dir="",
         template_dir="", crudify_funcs={}, user_class="", user_loader="",
         login_manager="flask_login.LoginManager",
         decorators=[
@@ -52,10 +53,13 @@ class Architect:
         request_class="powernap.architect.requests.ApiRequest",
         api_encoder="powernap.architect.responses.APIEncoder",
         before_request_funcs=["powernap.auth.rate_limit.check_rate_limit"],
-        after_request_funcs=[], permissions=None):
+        after_request_funcs=[], permissions=None,
+        decorators_receiving_app=['format_']):
         """
         :param version: (int): version number for endpoints registerd with this
             architect.
+        :param app_module: (str): the import path for the flask app to be used
+            for app_context, mainly used by passing the app to decorators.
         :param name: (string): a name for this architect
         :param prefix: (string): a url prefix to append to all endpoints.
             Requires '{}' to format in the version number. If not provided
@@ -88,8 +92,13 @@ class Architect:
             are . seperated values.  e.g. "device" or "device.edit".  Perms are
             recursive. Any user with the "device.edit" permission would also
             have the "device" permission.
+        :param decorators_receiving_app: (list): List of names of decorator
+            functions that will receive the flask app as a kwarg. Useful
+            if you need to maintain the app context for async funcs in the
+            decorator methods.
         """
         self.blueprints = []
+        self.app_module = app_module
         self.version = version
         self.name = name
         self._prefix = prefix
@@ -109,6 +118,7 @@ class Architect:
         self.after_request_funcs = [load_from_string(path)
                                     for path in after_request_funcs]
         self.permissions = permissions or []
+        self.decorators_receiving_app = decorators_receiving_app
 
     def _init_login_manager(self, login_manager, user_loader, user_class):
         """Loads the flask_login manager with the user retrieval function."""
@@ -159,8 +169,11 @@ class Architect:
                 kwargs[k] = v
 
         blueprint = self.response_blueprint(
-            name, self.decorators, default_options=default_options,
-            permissions=self.permissions, **kwargs)
+            name, self.app_module, self.decorators,
+            default_options=default_options,
+            decorators_receiving_app=self.decorators_receiving_app,
+            permissions=self.permissions, **kwargs
+        )
         for func in self.before_request_funcs:
             blueprint.before_request(func)
         for func in self.after_request_funcs:
@@ -185,10 +198,12 @@ class ResponseBlueprint(Blueprint):
     links = []
     cors_rules = []
 
-    def __init__(self, name, decorators, import_name='', crudify_funcs=None,
-                 default_options=None, permissions=None, **kwargs):
+    def __init__(self, name, app_module, decorators, import_name='', crudify_funcs=None,
+                 default_options=None, permissions=None, decorators_receiving_app=[],
+                 **kwargs):
         """
         :param name: (string): Name of blueprint.
+
         :param decorators: (list): List of functions that will decorate routes.
         :param import_name: (string): import name.
         :param crudfiy_funcs: (dict): Key is a crudify method, value is a
@@ -197,9 +212,15 @@ class ResponseBlueprint(Blueprint):
             decorators on this blueprints routes.
         :param permissions: (dict): Dictionary where keys are permissions and
             values are human readable strings.
+        :param decorators_receiving_app: (list): List of names of decorator
+            functions that will receive the flask app as a kwarg. Useful
+            if you need to maintain the app context for async funcs in the
+            decorator methods.
         """
         super(ResponseBlueprint, self).__init__(name, import_name, **kwargs)
+        self.app_module = app_module
         self.decorators = decorators
+        self.decorators_receiving_app = decorators_receiving_app
         self.crudify_funcs = crudify_funcs or {}
         self.default_options = default_options or {}
         self.permissions = permissions
@@ -222,7 +243,11 @@ class ResponseBlueprint(Blueprint):
             for decorator in self.decorators:
                 v = options.pop(decorator.__name__, None)
                 args = [f] if v is None else [f, v]
-                f = decorator(*args)
+                kwargs = {}
+                if decorator.__name__ in self.decorators_receiving_app and self.app_module:
+                    app = getattr(importlib.import_module(self.app_module), 'app')
+                    kwargs = {'app': app}
+                f = decorator(*args, **kwargs)
             options.update(self.default_route_options)
             self.add_url_rule(rule, endpoint, f, **options)
             return f
