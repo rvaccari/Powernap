@@ -1,3 +1,8 @@
+09-14-17 v1.2.0:
+
+Allow SQLAlchemy Properties and API Response keys to be excluded from queries
+
+
 6-07-17 v1.1.0:
 
 Give ability to whitelist ip networks for the rate limiter
