@@ -40,15 +40,26 @@ class BaseQueryColumn(object, metaclass=_QueryMeta):
         self.cls = cls
         self.query = query
 
-    def check_exposed_column(self, column):
-        if column and column not in self.cls.exposed_fields:
+    def check_exposed_column(self, column, func):
+        if func == "exclude":
+            pass
+        elif column and column not in self.cls.exposed_fields:
             errors = {'fields':{column: ["Invalid Argument: Field not exposed"]}}
+            raise InvalidFormError(description=errors)
+        return True
+
+    def check_excludable_properties(self, column, func):
+        if func != "exclude":
+            pass
+        elif column and column not in self.cls.excludable_properties:
+            errors = {'fields':{column: ["Invalid Argument: Property not excludable"]}}
             raise InvalidFormError(description=errors)
         return True
 
     def handle(self, column, value, func):
         """Updates the query based on the args."""
-        self.check_exposed_column(column)
+        self.check_exposed_column(column, func)
+        self.check_excludable_properties(column, func)
         return self.handle_method(column, value, func)
 
     def handle_method(self, column, value, func):

@@ -16,7 +16,8 @@ You would define the method:
 """
 import json
 
-from sqlalchemy import func
+from sqlalchemy import func, inspect
+
 from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.orm.util import _ORMJoin
 
@@ -48,6 +49,14 @@ def filter_by(cls, query, column, value):
         if hasattr(e, 'message'):
             bad_arg = e.message.split("'")[-2]
         raise_error(keys=bad_arg)
+
+
+def exclude(cls, query, column, value):
+    mapper = inspect(cls)
+    if not mapper.exclude_properties:
+        mapper.exclude_properties = set()
+    mapper.exclude_properties.add(column)
+    return query
 
 
 def order_by(cls, query, column, value):

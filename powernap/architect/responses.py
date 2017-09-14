@@ -3,7 +3,8 @@ import json
 import re
 from decimal import Decimal
 
-from flask import current_app, jsonify, Response, request
+from sqlalchemy import inspect
+from flask import current_app, jsonify, Response, request, session
 from flask_login import current_user
 from flask_sqlalchemy import Pagination
 
@@ -11,6 +12,7 @@ from flask_sqlalchemy import Pagination
 class APIEncoder(json.JSONEncoder):
     """Allows json.dumps to accept classses with api_respones method."""
     def default(self, o):
+
         if isinstance(o, Decimal):
             return float(o)
         elif hasattr(o, 'isoformat'):
@@ -81,10 +83,19 @@ class ApiResponse(object):
         Read more at: http://flask.pocoo.org/docs/0.10/security/#json-security.
         """
         formatted = []
+        exclude_properties = session.get('exclude_properties')
+
         for item in results:
             if hasattr(item, 'api_response'):
-                item = item.api_response()
+                try:
+                    item = item.api_response(**{'exclude_properties': exclude_properties})
+                except TypeError:
+                    item = item.api_response()
             formatted.append(item)
+
+        if exclude_properties:
+            del session.exclude_properties
+
         return formatted
 
     def get_pagination_params(self, results):
@@ -113,7 +124,6 @@ class ApiResponse(object):
         """Make and return the json response."""
         if isinstance(results, dict):
             resp = jsonify(**{str(k): v for k, v in results.items()})
-            print(resp)
         else:
             results = json.dumps(results, cls=self.json_encoder)
             resp = Response(results, mimetype='application/json')

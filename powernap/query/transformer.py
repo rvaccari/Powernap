@@ -1,6 +1,6 @@
 from collections import deque
 
-from flask import current_app, request
+from flask import current_app, request, session
 from flask_login import current_user
 from sqlalchemy import exc
 
@@ -76,6 +76,7 @@ class QueryTransformer:
     def __init__(self, cls=None, query=None):
         self.cls = cls or query._primary_entity.type
         self.initial_query = query
+        self.exclude_properties = []
         self.page = current_app.config['PAGINATION_PAGE']
         self.per_page = current_app.config['PAGINATION_PER_PAGE']
         self.pagination = (self.page, self.per_page)
@@ -124,6 +125,7 @@ class QueryTransformer:
         special, is not a pagination kwarg, & is an invalid field will raise
         a subclassed :class:`core.api.exceptions.ApiError`.
         """
+        self.pop_exclude_kwargs(query_args)
         paginate = self.pop_pagination_kwargs(query_args)
         query = self.create_query(query_args)
         return self.paginate_query(query, paginate)
@@ -174,6 +176,13 @@ class QueryTransformer:
         impl_cls = self.query_columns.get(type_cls, BaseQueryColumn)
         return impl_cls(self.cls, query).handle(column, value, func)
 
+    def pop_exclude_kwargs(self, kwargs):
+        for key in kwargs:
+            if key.endswith('__exclude'):
+                self.exclude_properties.append(key.split('__')[0][1:])
+        session.exclude_properties = self.exclude_properties
+        return True
+
     def pop_pagination_kwargs(self, kwargs):
         """Return popped kwargs of first items in `self.pagination` tuples.
 
@@ -197,6 +206,7 @@ class QueryTransformer:
 
     def paginate_query(self, query, paginate):
         """Return :class:`flask_sqlalchemy.Pagination` object from query."""
+
         try:
             return query.paginate(paginate.get(self.page, 1),
                                   paginate.get(self.per_page, query.count()),
