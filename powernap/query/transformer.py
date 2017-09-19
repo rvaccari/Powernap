@@ -180,7 +180,7 @@ class QueryTransformer:
         for key in kwargs:
             if key.endswith('__exclude'):
                 self.exclude_properties.append(key.split('__')[0][1:])
-        session.exclude_properties = self.exclude_properties
+        session.exclude_properties = list(self.exclude_properties)
         return True
 
     def pop_pagination_kwargs(self, kwargs):

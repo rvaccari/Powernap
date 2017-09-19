@@ -83,8 +83,7 @@ class ApiResponse(object):
         Read more at: http://flask.pocoo.org/docs/0.10/security/#json-security.
         """
         formatted = []
-        exclude_properties = session.get('exclude_properties')
-
+        exclude_properties = list(session.exclude_properties)
         for item in results:
             if hasattr(item, 'api_response'):
                 try:
