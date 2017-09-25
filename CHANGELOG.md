@@ -1,4 +1,4 @@
-09-14-17 v1.2.0:
+09-14-17 v1.2.1:
 
 Allow SQLAlchemy Properties and API Response keys to be excluded from queries
 
