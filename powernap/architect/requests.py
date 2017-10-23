@@ -1,4 +1,6 @@
-from flask import Request
+import ipaddress
+
+from flask import Request, current_app
 from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import BadRequest
 
@@ -21,3 +23,23 @@ class ApiRequest(Request):
         d = self.__dict__
         d['form'] = formdata
         d['files'], d['stream'] = None, None
+
+    @property
+    def remote_addr(self):
+        """Safely get the originating ip of the request.
+
+        See: https://stackoverflow.com/a/22936947/3453043
+        """
+        remote_addr = super(ApiRequest, self).remote_addr
+        route = reversed(self.access_route + [remote_addr])
+        route = map(ipaddress.ip_address, route)
+        trusted_proxies = map(ipaddress.ip_network, self.trusted_proxies)
+        for ip in route:
+            for proxy in trusted_proxies:
+                if ip in trusted_proxies:
+                    continue
+            return str(ip)
+
+    @property
+    def trusted_proxies(self):
+        return current_app.config.get('TRUSTED_PROXIES', [])
