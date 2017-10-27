@@ -36,7 +36,7 @@ class ApiRequest(Request):
         trusted_proxies = map(ipaddress.ip_network, self.trusted_proxies)
 
         if not route:
-            return ''
+            return '127.0.0.1'
 
         for ip in route:
             for proxy in trusted_proxies:
