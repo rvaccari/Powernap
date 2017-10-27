@@ -31,12 +31,13 @@ class ApiRequest(Request):
         See: https://stackoverflow.com/a/22936947/3453043
         """
         remote_addr = super(ApiRequest, self).remote_addr
+
+        if not remote_addr:
+            return '127.0.0.1'
+
         route = reversed(self.access_route + [remote_addr])
         route = map(ipaddress.ip_address, route)
         trusted_proxies = map(ipaddress.ip_network, self.trusted_proxies)
-
-        if not route:
-            return '127.0.0.1'
 
         for ip in route:
             for proxy in trusted_proxies:
