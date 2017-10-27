@@ -34,6 +34,10 @@ class ApiRequest(Request):
         route = reversed(self.access_route + [remote_addr])
         route = map(ipaddress.ip_address, route)
         trusted_proxies = map(ipaddress.ip_network, self.trusted_proxies)
+
+        if not route:
+            return ''
+
         for ip in route:
             for proxy in trusted_proxies:
                 if ip in trusted_proxies:
