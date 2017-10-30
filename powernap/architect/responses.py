@@ -79,7 +79,7 @@ class ApiResponse(object):
     def log_error_if_bad_admin_request(self, data):
         if not current_app.config['DEBUG'] and \
                 getattr(current_user, 'is_admin', False) and \
-                status_code // 100 == 4:
+                self.status_code // 100 == 4:
             msg = "Bad Admin Request to '{}': {}".format(request.path, data)
             logging.warning(msg)
 
