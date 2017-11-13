@@ -21,7 +21,10 @@ class PowernapMixin(object):
     def delete(self):
         session = self.session()
         session.delete(self)
-        session.commit()
+        try:
+            session.commit()
+        except:
+            session.rollback()
         return True
 
     @classmethod
@@ -34,7 +37,11 @@ class PowernapMixin(object):
     def save(self):
         session = self.session()
         session.add(self)
-        session.commit()
+        try:
+            session.commit()
+        except:
+            session.rollback()
+
         return True
 
     @classmethod
