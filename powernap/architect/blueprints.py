@@ -112,7 +112,10 @@ class Architect:
         self.after_request_funcs = [load_from_string(path)
                                     for path in after_request_funcs]
         self.permissions = permissions or []
-        self.graphql_session_func = load_from_string(graphql_session_func)
+
+        self.graphql_session_func = graphql_session_func
+        if self.graphql_session_func:
+            self.graphql_session_func = load_from_string(graphql_session_func)
 
     def _init_login_manager(self, login_manager, user_loader, user_class):
         """Loads the flask_login manager with the user retrieval function."""
