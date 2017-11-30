@@ -157,6 +157,7 @@ Usage: `@bp.route('/item', methods=["GET"], public=True)`
 ## Graphql
 
 Making GraphQL endpoints with powernap is easy. Just define your schema as usual and pass it to the `graphql_view` function of a sub_blueprint.
+
 **Note: the `format_` decorator is needed for graphql endpoints.  More explicitly, not using a cusotm response for graphql_views is required.**
 
 ```python
@@ -181,13 +182,12 @@ class Query(graphene.ObjectType):
 
 schema = graphene.Schema(query=Query)
 
-`bp.graphql_view('/graphql/users', schema)`
+bp.graphql_view('/graphql/users', schema)
 ```
 
-We suggest using [Insomnia](https://insomnia.rest/)'s graphql body.
+We suggest using [Insomnia](https://insomnia.rest/)'s graphql body. Example request:
 
 ```
-# Example Request
 query {
   users{
       id
@@ -205,6 +205,7 @@ bp.graphql_view('/graphql/users', schema, session=db_session)
 
 You can pass any of the decorator arguments to `graphql_view` as well. By default
 the view inhereits the values of its parent sub blueprint just like a regular view added with `route`.
+
 **Do not override the `methods` or the `format_` kwargs as they are set to 
 default values needed for graphql endpoints.**
 
