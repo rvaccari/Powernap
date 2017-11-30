@@ -154,6 +154,64 @@ Kwarg defaults to `False`.
 Usage: `@bp.route('/item', methods=["GET"], public=True)`
 
 
+## Graphql
+
+Making GraphQL endpoints with powernap is easy. Just define your schema as usual and pass it to the `graphql_view` function of a sub_blueprint.
+**Note: the `format_` decorator is needed for graphql endpoints.  More explicitly, not using a cusotm response for graphql_views is required.**
+
+```python
+import graphene
+from graphene_sqlalchemy import SQLAlchemyObjectType
+
+from models import UserModel
+
+
+class User(SQLAlchemyObjectType):
+    class Meta:
+        model = UserModel
+
+
+class Query(graphene.ObjectType):
+    users = graphene.List(User)
+
+    def resolve_users(self, info):
+        query = User.get_query(info)
+        return query.all()
+
+
+schema = graphene.Schema(query=Query)
+
+`bp.graphql_view('/graphql/users', schema)`
+```
+
+We suggest using [Insomnia](https://insomnia.rest/)'s graphql body.
+
+```
+# Example Request
+query {
+  users{
+      id
+  }
+}
+```
+
+You can explicitly define the database session by passing it as a kwarg.
+
+```python
+engine = create_engine('sqlite:///demo.db')
+db_session = scoped_session(sessionmaker(bind=engine))
+bp.graphql_view('/graphql/users', schema, session=db_session)
+```
+
+You can pass any of the decorator arguments to `graphql_view` as well. By default
+the view inhereits the values of its parent sub blueprint just like a regular view added with `route`.
+**Do not override the `methods` or the `format_` kwargs as they are set to 
+default values needed for graphql endpoints.**
+
+```python
+bp.graphql_view('/graphql/users', schema, public=True, permission='view_user')
+```
+
 # Models 
 
 In many API's some or all of an entry in a databse is returned to the user.  Powernap implements multiple helper utilities to make this process easier.
