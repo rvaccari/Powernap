@@ -1,3 +1,8 @@
+09-14-17 1.5.2:
+
+Allow comma seperated values to be passed to order by.
+
+
 09-14-17 v1.2.1:
 
 Allow SQLAlchemy Properties and API Response keys to be excluded from queries

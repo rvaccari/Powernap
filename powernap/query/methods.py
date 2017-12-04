@@ -60,14 +60,17 @@ def exclude(cls, query, column, value):
 
 
 def order_by(cls, query, column, value):
-    modifier = "asc"
-    if value.startswith('-'):
-        modifier = "desc"
-        value = value[1:]
-    try:
-        return query.order_by(getattr(getattr(cls, value), modifier)())
-    except AttributeError:
-        raise_error(keys=value)
+    values = value.split(',')
+    for value in values:
+        modifier = "asc"
+        if value.startswith('-'):
+            modifier = "desc"
+            value = value[1:]
+        try:
+            query = query.order_by(getattr(getattr(cls, value), modifier)())
+        except AttributeError:
+            raise_error(keys=value)
+    return query
 
 
 def not_eq(cls, query, column, value):
