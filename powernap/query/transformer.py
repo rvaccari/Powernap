@@ -141,23 +141,34 @@ class QueryTransformer:
     def prep_for_impl(self, kwargs):
         """Return list of tuples for each column.
 
-        Appends tuples for filter_by to the beggining of the list.
+        Appends tuples for filter_by to the beginning of the list.
         The rest are appended in the order they are passed.
 
         NOTE: A priority system would be useful for the future.
         """
         impl_data = deque()
+        ordering_priority = None
         for column, value in kwargs.items():
             method = 'appendleft'
             func = None
             if column.startswith('$') and not hasattr(self.cls, column[1:]):
                 column = column[1:]
+
+                if column == 'order_by_priority':
+                    ordering_priority = value
+                    continue
+
                 method = 'append'
                 if '__' in column:
                     column, func = column.split('__')
                 else:
                     func = column
                     column = None
+
+            if method == 'order_by':
+                value = (value, ordering_priority)
+                ordering_priority = None
+
             getattr(impl_data, method)((column, value, func))
         return impl_data
 

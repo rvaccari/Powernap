@@ -1,3 +1,8 @@
+01-25-18 1.6.0:
+
+Add `graphql_middleware` param to `Architect` and `Blueprint` for middleware funcs.
+
+
 09-14-17 1.5.2:
 
 Allow comma seperated values to be passed to order by.

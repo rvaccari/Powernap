@@ -53,7 +53,8 @@ class Architect:
         request_class="powernap.architect.requests.ApiRequest",
         api_encoder="powernap.architect.responses.APIEncoder",
         before_request_funcs=["powernap.auth.rate_limit.check_rate_limit"],
-        after_request_funcs=[], permissions=None, graphql_session_func=None):
+        after_request_funcs=[], permissions=None, graphql_session_func=None,
+        graphql_middleware=[]):
         """
         :param version: (int): version number for endpoints registerd with this
             architect.
@@ -91,6 +92,8 @@ class Architect:
             have the "device" permission.
         :param graphql_session_func: (string): Path to Func when executed
             returns a SqlAlchemy session to be used with graphql views.
+        :param graphql_middleware: (list): List of paths (str) to middleware
+            funcs for graphql endpoint.
         """
         self.blueprints = []
         self.version = version
@@ -116,6 +119,8 @@ class Architect:
         self.graphql_session_func = graphql_session_func
         if self.graphql_session_func:
             self.graphql_session_func = load_from_string(graphql_session_func)
+        self.graphql_middleware = [load_from_string(path)
+                                   for path in graphql_middleware]
 
     def _init_login_manager(self, login_manager, user_loader, user_class):
         """Loads the flask_login manager with the user retrieval function."""
@@ -161,6 +166,7 @@ class Architect:
             'template_folder': self.template_dir,
             "crudify_funcs": self.crudify_funcs,
             "graphql_session_func": self.graphql_session_func,
+            "graphql_middleware": self.graphql_middleware,
         }
         for k, v in defaults.items():
             if k not in kwargs:
@@ -195,7 +201,7 @@ class ResponseBlueprint(Blueprint):
 
     def __init__(self, name, decorators, import_name='', crudify_funcs=None,
                  default_options=None, permissions=None,
-                 graphql_session_func=None, **kwargs):
+                 graphql_session_func=None, graphql_middleware=[], **kwargs):
         """
         :param name: (string): Name of blueprint.
         :param decorators: (list): List of functions that will decorate routes.
@@ -208,6 +214,8 @@ class ResponseBlueprint(Blueprint):
             values are human readable strings.
         :param graphql_session_func: (func): Function when executed returns
             a SqlAlchemy session to be used with graphql views.
+        :param graphql_middleware: (list): List of paths (str) to middleware
+            funcs for graphql endpoint.
         """
         super(ResponseBlueprint, self).__init__(name, import_name, **kwargs)
         self.decorators = decorators
@@ -215,6 +223,7 @@ class ResponseBlueprint(Blueprint):
         self.default_options = default_options or {}
         self.permissions = permissions
         self.graphql_session_func = graphql_session_func
+        self.graphql_middleware = graphql_middleware
 
     def route(self, rule, **options):
         """Wrap view with api response decorators, make `self.link`."""
@@ -243,7 +252,9 @@ class ResponseBlueprint(Blueprint):
     def graphql_view(self, rule, schema, session=None, **options):
         session = session or self.graphql_session_func()
         view = GraphQLView.as_view(
-            rule, schema=schema, graphiql=True, context={'session': session})
+            rule, schema=schema, graphiql=True, context={'session': session},
+            middleware=self.graphql_middleware
+        )
         self.route(rule, methods=['GET', 'POST'], format_=False, **options)(view)
 
     def options(self, options):
