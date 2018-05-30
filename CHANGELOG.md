@@ -1,3 +1,8 @@
+06-08-18 1.5.3:
+
+Fix AttributeError: 'NoneType' object has no attribute 'read'
+
+
 09-14-17 1.5.2:
 
 Allow comma seperated values to be passed to order by.
