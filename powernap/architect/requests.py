@@ -3,26 +3,19 @@ import ipaddress
 from flask import Request, current_app
 from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import BadRequest
+from werkzeug.utils import cached_property
 
 from powernap.exceptions import InvalidJsonError
 
 
 class ApiRequest(Request):
-    def _load_form_data(self):
-        """Makes request.form access the JSON body"""
-        try:
-            formdata = self.get_json(force=True)
-        except BadRequest:
-            formdata = {}
-        if not formdata:
-            formdata = {}
+    @cached_property
+    def form(self):
+        """Parses and requires request.form to be a JSON dict/map"""
+        formdata = self.get_json(force=True, silent=True) or {}
         if not isinstance(formdata, dict):
-            raise InvalidJsonError(description="Form not JSON compatible.")
-        formdata = MultiDict(list(formdata.items()))
-
-        d = self.__dict__
-        d['form'] = formdata
-        d['files'], d['stream'] = None, None
+            raise InvalidJsonError(description="Form not API compatible JSON.")
+        return MultiDict(formdata)
 
     @property
     def remote_addr(self):
