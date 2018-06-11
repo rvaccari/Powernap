@@ -9,13 +9,30 @@ from powernap.exceptions import InvalidJsonError
 
 
 class ApiRequest(Request):
+    # complete clone of `werkzeug.wrappers.data()` changing only
+    # `parse_form_data` from True to False. This fixes the recursion error,
+    # `self.stream == None`, caused by Sentry raven calling `get_json_data`
     @cached_property
-    def form(self):
-        """Parses and requires request.form to be a JSON dict/map"""
-        formdata = self.get_json(force=True, silent=True) or {}
+    def data(self):
+        if self.disable_data_descriptor:
+            raise AttributeError('data descriptor is disabled')
+        return self.get_data(parse_form_data=False)
+
+    def _load_form_data(self):
+        """Makes request.form access the JSON body"""
+        try:
+            formdata = self.get_json(force=True)
+        except BadRequest:
+            formdata = {}
+        if not formdata:
+            formdata = {}
         if not isinstance(formdata, dict):
             raise InvalidJsonError(description="Form not API compatible JSON.")
-        return MultiDict(formdata)
+        formdata = MultiDict(list(formdata.items()))
+
+        d = self.__dict__
+        d['form'] = formdata
+        d['files'], d['stream'] = None, None
 
     @property
     def remote_addr(self):
