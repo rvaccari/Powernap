@@ -9,11 +9,15 @@ from powernap.exceptions import InvalidJsonError
 
 
 class ApiRequest(Request):
-    # complete clone of `werkzeug.wrappers.data()` changing only
-    # `parse_form_data` from True to False. This fixes the recursion error,
-    # `self.stream == None`, caused by Sentry raven calling `get_json_data`
     @cached_property
     def data(self):
+        """Contains the incoming request data as string in case it came with
+        a mimetype Werkzeug does not handle.
+
+        Note: This is a complete clone of `werkzeug.wrappers.data()` changing
+        only `parse_form_data` from True to False. This fixes the recursion
+        error, `self.stream == None`, caused by Sentry raven calling
+        `get_json_data`."""
         if self.disable_data_descriptor:
             raise AttributeError('data descriptor is disabled')
         return self.get_data(parse_form_data=False)
