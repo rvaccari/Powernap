@@ -1,3 +1,10 @@
+06-11-18 1.5.4:
+
+Re-Fix AttributeError: 'NoneType' object has no attribute 'read'.
+The last fix broke in another location. This one hacks
+werkzeug.wrappers.data to avoid the problem.
+
+
 06-08-18 1.5.3:
 
 Fix AttributeError: 'NoneType' object has no attribute 'read'
