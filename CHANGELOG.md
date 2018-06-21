@@ -1,3 +1,8 @@
+06-22-18 2.0.0:
+
+Convert low-level json form magic code to a top-level `jsonform`
+cached property on ApiRequest. This breaks the interface, so a new major version.
+
 06-21-18 1.5.5:
 
 Fix request.remote_addr logic to return the correct, first untrusted

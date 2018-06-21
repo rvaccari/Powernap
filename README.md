@@ -425,7 +425,7 @@ def get_one_func(id):
     return instance, success_code
 
 def post_func():
-    form = create_form(request.form)
+    form = create_form(request.jsonform)
     if form.validate():
         instance = form.create_obj()
         return instance, post_success_code
@@ -434,7 +434,7 @@ def post_func():
 def put_func(id):
     instance = model.query.get_or_404(id)
     instance.confirm_owner()
-    form = update_form(request.form, instance=instance)
+    form = update_form(request.jsonform, instance=instance)
     if form.validate():
         instance = form.update_obj(instance)
         return instance, success_code
@@ -545,7 +545,7 @@ bp = architect.sub_blueprint('token', url_prefix='/token')
 # access the endpoint.
 @bp.route('', methods=['POST'], login=False, public=True)
 def auth():
-    form = TokenForm(request.form)
+    form = TokenForm(request.jsonform)
     if form.validate():
         return {'token': form.api_token}, success_code
     return form.errors, unprocessable_code
