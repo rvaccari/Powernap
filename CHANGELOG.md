@@ -1,3 +1,8 @@
+06-21-18 1.5.5:
+
+Fix request.remote_addr logic to return the correct, first untrusted
+address.
+
 06-11-18 1.5.4:
 
 Re-Fix AttributeError: 'NoneType' object has no attribute 'read'.
