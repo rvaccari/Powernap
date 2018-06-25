@@ -1,4 +1,8 @@
+# pylint: disable=too-many-ancestors
+"""Extend Flask's Request class with fixes and helpers"""
+
 import ipaddress
+from contextlib import suppress
 
 from flask import Request, current_app
 from werkzeug.datastructures import MultiDict
@@ -9,34 +13,20 @@ from powernap.exceptions import InvalidJsonError
 
 
 class ApiRequest(Request):
+    """Extended Request class with fixes and helpers"""
+
     @cached_property
-    def data(self):
-        """Contains the incoming request data as string in case it came with
-        a mimetype Werkzeug does not handle.
-
-        Note: This is a complete clone of `werkzeug.wrappers.data()` changing
-        only `parse_form_data` from True to False. This fixes the recursion
-        error, `self.stream == None`, caused by Sentry raven calling
-        `get_json_data`."""
-        if self.disable_data_descriptor:
-            raise AttributeError('data descriptor is disabled')
-        return self.get_data(parse_form_data=False)
-
-    def _load_form_data(self):
-        """Makes request.form access the JSON body"""
-        try:
-            formdata = self.get_json(force=True)
-        except BadRequest:
-            formdata = {}
-        if not formdata:
-            formdata = {}
-        if not isinstance(formdata, dict):
-            raise InvalidJsonError(description="Form not API compatible JSON.")
-        formdata = MultiDict(list(formdata.items()))
-
-        d = self.__dict__
-        d['form'] = formdata
-        d['files'], d['stream'] = None, None
+    def jsonform(self):
+        """Parses and returns form for JSON body"""
+        formdata = {}
+        with suppress(BadRequest):
+            formdata = self.get_json(force=True) or {}
+            if not isinstance(formdata, dict):
+                raise InvalidJsonError(description="Form not API compatible: must be JSON object.")
+        # TODO Harvey Add a log warning check here (for non-empty dicts)
+        # for incorrect mimetype. `if formdata and not self.is_json: warning`
+        # This will help catch bugs in our own apps like myv.
+        return MultiDict(formdata)
 
     @property
     def remote_addr(self):
