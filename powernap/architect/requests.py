@@ -28,7 +28,7 @@ class ApiRequest(Request):
                     'JSON data with incorrect mimetype! {} {} {} {}'.format(
                         self.remote_addr, self.method, self.scheme, self.full_path,
                     ))
-        return MultiDict(formdata)
+        return MultiDict(list(formdata.items()))
 
     @property
     def remote_addr(self):

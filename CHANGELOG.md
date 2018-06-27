@@ -1,3 +1,7 @@
+06-27-18 2.0.2:
+
+Fix improper use of MultiDict
+
 06-27-18 2.0.1:
 
 Fix two missed request.form uses. Add warning for incorrect json mimetype.
