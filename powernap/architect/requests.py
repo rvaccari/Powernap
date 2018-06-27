@@ -28,6 +28,10 @@ class ApiRequest(Request):
                     'JSON data with incorrect mimetype! {} {} {} {}'.format(
                         self.remote_addr, self.method, self.scheme, self.full_path,
                     ))
+        # The MultiDict *must* be created this way. It treats a passed dict as a
+        # MultiDict which is not what you want.
+        # A normal dict converted (correctly) to a MultiDict looks like the following
+        # inside of the MultiDict: {k:[v] for k, v in dict.items()}
         return MultiDict(list(formdata.items()))
 
     @property
