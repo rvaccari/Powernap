@@ -23,9 +23,11 @@ class ApiRequest(Request):
             formdata = self.get_json(force=True) or {}
             if not isinstance(formdata, dict):
                 raise InvalidJsonError(description="Form not API compatible: must be JSON object.")
-        # TODO Harvey Add a log warning check here (for non-empty dicts)
-        # for incorrect mimetype. `if formdata and not self.is_json: warning`
-        # This will help catch bugs in our own apps like myv.
+            if formdata and self.mimetype != 'application/json':
+                current_app.logger.warning(
+                    'JSON data with incorrect mimetype! {} {} {} {}'.format(
+                        self.remote_addr, self.method, self.scheme, self.full_path,
+                    ))
         return MultiDict(formdata)
 
     @property

@@ -1,3 +1,7 @@
+06-27-18 2.0.1:
+
+Fix two missed request.form uses. Add warning for incorrect json mimetype.
+
 06-22-18 2.0.0:
 
 Convert low-level json form magic code to a top-level `jsonform`
