@@ -1,3 +1,7 @@
+06-29-18 2.0.3:
+
+Make package requirements minimum versions rather than specific.
+
 06-27-18 2.0.2:
 
 Fix improper use of MultiDict
