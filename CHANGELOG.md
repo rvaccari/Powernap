@@ -1,3 +1,7 @@
+07-05-18 2.0.5:
+
+Rename deprecated imports.
+
 07-05-18 2.0.4:
 
 Rename deprecated imports.

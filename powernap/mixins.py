@@ -1,6 +1,6 @@
 import sqlalchemy
 from flask import current_app
-from flask.ext.sqlalchemy import BaseQuery
+from flask_sqlalchemy import BaseQuery
 from flask_login import current_user
 
 from powernap.exceptions import OwnerError
