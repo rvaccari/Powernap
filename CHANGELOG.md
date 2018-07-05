@@ -1,3 +1,7 @@
+07-05-18 2.0.4:
+
+Rename deprecated imports.
+
 06-29-18 2.0.3:
 
 Make package requirements minimum versions rather than specific.
