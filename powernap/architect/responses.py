@@ -61,7 +61,7 @@ class ApiResponse(object):
             "current": data.page,
             'first': 1,
             'last': data.pages,
-            'next': data.pages if data.next_num > data.pages else data.next_num,
+            'next': data.next_num if data.has_next else data.pages,
             'per_page': data.per_page,
             'previous': data.prev_num,
             'total': data.total,
