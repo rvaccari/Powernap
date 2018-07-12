@@ -1,3 +1,8 @@
+07-12-18 2.0.7:
+
+Use data.has_prev property to determine pagination. prev_num was changed
+to return None when there is no prev page.
+
 07-09-18 2.0.6:
 
 Use data.has_next property to determine pagination. next_num was changed
