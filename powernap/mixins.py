@@ -1,3 +1,5 @@
+import contextlib
+
 import sqlalchemy
 from flask import current_app
 from flask_sqlalchemy import BaseQuery
@@ -18,13 +20,19 @@ class PowernapMixin(object):
     def session(self):
         return self.query.session
 
-    def delete(self):
-        session = self.session()
-        session.delete(self)
+    @contextlib.contextmanager
+    def session_committer(self):
         try:
+            session = self.session()
+            yield session
             session.commit()
-        except:
+        except Exception as e:
+            current_app.logger.warning('Rollback: {}'.format(str(e)))
             session.rollback()
+
+    def delete(self):
+        with self.session_committer() as session:
+            session.delete(self)
         return True
 
     @classmethod
@@ -35,13 +43,8 @@ class PowernapMixin(object):
         return True
 
     def save(self):
-        session = self.session()
-        session.add(self)
-        try:
-            session.commit()
-        except:
-            session.rollback()
-
+        with self.session_committer() as session:
+            session.add(self)
         return True
 
     @classmethod
