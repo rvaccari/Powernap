@@ -1,3 +1,7 @@
+07-16-18 2.0.8:
+
+Log warnings and errors from database connections.
+
 07-12-18 2.0.7:
 
 Use data.has_prev property to determine pagination. prev_num was changed
