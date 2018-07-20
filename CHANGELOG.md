@@ -1,3 +1,8 @@
+07-20-18 2.1.0:
+
+Pinned versions for Graphene and Graphene-Sqlalchemy, they break Enum stuff
+
+
 07-16-18 2.0.9:
 
 Same as 2.0.8 (but uploaded correctly)
