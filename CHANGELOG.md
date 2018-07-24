@@ -1,3 +1,7 @@
+07-23-18 2.2.0:
+
+Refactored Mixins to return database errors.
+
 07-20-18 2.1.0:
 
 Pinned versions for Graphene and Graphene-Sqlalchemy, they break Enum stuff

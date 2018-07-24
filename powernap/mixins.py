@@ -21,19 +21,20 @@ class PowernapMixin(object):
         return self.query.session
 
     @contextlib.contextmanager
-    def session_committer(self):
+    def session_context(self):
         try:
             session = self.session()
             yield session
-            session.commit()
         except Exception as e:
             current_app.logger.warning('Rollback: {}'.format(str(e)))
             session.rollback()
 
     def delete(self):
-        with self.session_committer() as session:
+        with self.session_context() as session:
             session.delete(self)
-        return True
+            session.commit()
+            return True
+        return False
 
     @classmethod
     def safe_delete(cls, pk):
@@ -43,9 +44,11 @@ class PowernapMixin(object):
         return True
 
     def save(self):
-        with self.session_committer() as session:
+        with self.session_context() as session:
             session.add(self)
-        return True
+            session.commit()
+            return self
+        return None
 
     @classmethod
     def exists(cls, **kwargs):
@@ -74,9 +77,7 @@ class PowernapMixin(object):
 
     @classmethod
     def create(cls, **kwargs):
-        instance = cls(**kwargs)
-        instance.save()
-        return instance
+        return cls(**kwargs).save()
 
     def confirm_owner(self, throw=True):
         client_key, db_entry_key = model_attrs()
@@ -100,8 +101,7 @@ class PowernapFormMixin(object):
         return self.commit(**kwargs)
 
     def save_obj(self, instance):
-        instance.save()
-        return instance
+        return instance.save()
 
     def delete_obj(self, model=None, **kwargs):
         if model is None:
