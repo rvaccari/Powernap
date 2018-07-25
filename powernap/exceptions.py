@@ -6,7 +6,6 @@ from powernap.http_codes import (
     forbidden_code,
     too_many_requests_code,
     unauthorized_code,
-    internal_server_error_code,
 )
 
 
@@ -22,12 +21,6 @@ class ApiError(Exception):
         """
         self.description = description
         super(Exception, self).__init__()
-
-
-class DatabaseError(ApiError):
-    """Raise when a database error occurs."""
-
-    code = internal_server_error_code
 
 
 class InvalidFormError(ApiError):
@@ -51,18 +44,17 @@ class InvalidDataFormatError(ApiError):
     code = error_code
 
 
-# TODO Harvey - why not 401 UnauthorizedError
 class OwnerError(ApiError):
     """Raise when user tries to access a db model they don't own."""
 
+    # Intentionally Not Found to avoid security probing for private endpoints
     code = not_found_code
 
 
-# TODO Harvey - why not 401 UnauthorizedError
 class PermissionError(ApiError):
     """Raise when user tries to access page without proper permissions."""
 
-    code = forbidden_code
+    code = unauthorized_code
 
 
 class RequestLimitError(ApiError):

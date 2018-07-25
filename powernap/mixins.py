@@ -5,7 +5,7 @@ from flask import current_app
 from flask_sqlalchemy import BaseQuery
 from flask_login import current_user
 
-from powernap.exceptions import OwnerError, DatabaseError
+from powernap.exceptions import OwnerError
 from powernap.helpers import model_attrs
 
 
@@ -28,14 +28,6 @@ class PowernapMixin(object):
         except Exception as e:
             current_app.logger.warning('Rollback: {}'.format(str(e)))
             session.rollback()
-            # TODO Harvey - should we raise here instead of or in addition to returning status?
-            #               Raising would catch code that ignores errors (the common old pattern):
-            #                   instance.save()
-            #                   return instance
-            #               We have to be careful though. If encounter a DatabaseError inside
-            #               a method like default_user() used by flask.login_manager, it won't be
-            #               caught properly.
-            # raise DatabaseError()
 
     def delete(self):
         with self.session_context() as session:
@@ -51,7 +43,6 @@ class PowernapMixin(object):
         obj.delete()
         return True
 
-    # TODO Harvey - should we raise here instead of or in addition to returning None?
     def save(self):
         with self.session_context() as session:
             session.add(self)
