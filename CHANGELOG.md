@@ -1,3 +1,7 @@
+10-10-18 2.2.1:
+
+Added CORS logging and changed CORS to take configuration from app.config.
+
 07-23-18 2.2.0:
 
 Refactored Mixins to return database errors.
