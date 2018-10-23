@@ -1,3 +1,7 @@
+10-23-18 2.2.2:
+
+Add an ugly request rate limiting hack for admins to prevent crashing.
+
 10-10-18 2.2.1:
 
 Added CORS logging and changed CORS to take configuration from app.config.
