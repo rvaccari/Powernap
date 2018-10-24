@@ -83,8 +83,13 @@ class RateLimiter:
         return current_app.config[val]
 
     def redis_token(self):
+        # TODO: DVTM-1054 fix admin token rate limiting properly
+        from contextlib import suppress
+        user_id = 'unknown_maybe_admin'
+        with suppress(BaseException):
+            user_id = self.user.id
         return "{}:{}:{}".format(
             str(self.user.__class__),
-            self.user.id,
+            user_id,
             request.remote_addr,
         )
