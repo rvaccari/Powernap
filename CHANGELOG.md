@@ -1,3 +1,7 @@
+01-23-19 2.2.3:
+
+Pass custom exception arguments to base classes so we get messages in the logs.
+
 10-23-18 2.2.2:
 
 Add an ugly request rate limiting hack for admins to prevent crashing.
