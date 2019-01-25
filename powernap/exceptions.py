@@ -12,7 +12,7 @@ from powernap.http_codes import (
 class ApiError(Exception):
     """Triggers Flask error handler :meth:`core.api.exceptions.api_error`."""
 
-    def __init__(self, description=None):
+    def __init__(self, *args, description=None, **kwargs):
         """Create an ApiError with an optional description.
 
         :param description: A json serializable object or data structure
@@ -20,7 +20,7 @@ class ApiError(Exception):
             the key `errors`.
         """
         self.description = description
-        super(Exception, self).__init__()
+        super().__init__(*args, **kwargs)
 
 
 class InvalidFormError(ApiError):
