@@ -15,6 +15,13 @@ if __name__ == '__main__':
             "powernap.auth",
             "powernap.query"
         ],
+        extras_require={
+            'dev': [
+                'pytest>=4.1.1',
+                'pytest-cov>=2.6.1',
+                'coverage==4.5.2',
+            ],
+        },
         install_requires=[
             'requests>=2.13.0',
             'six>=1.10.0',
