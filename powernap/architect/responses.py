@@ -43,7 +43,6 @@ class ApiResponse(object):
         self.data = data
         self.headers = headers or {}
         self.status_code = status_code
-        self.headers = headers or {}
         self.json_encoder = self.prepped_encoder(json_encoder)
         if isinstance(data, Pagination):
             self.headers.update({'X-Pagination': self.pagination_headers(data)})
